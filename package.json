@@ -1,0 +1,66 @@
+{
+  "name": "gleech",
+  "version": "0.2.1",
+  "description": "Universal image glitching and 3-bit dithering engine for Node.js and browser canvas (fork of Glitchy3bitDither)",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "gleech": "./bin/gleech"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./core": "./src/core/glitch-engine.js"
+  },
+  "files": [
+    "bin",
+    "index.js",
+    "src/core",
+    "src/workers"
+  ],
+  "contributors": [
+    {
+      "name": "Nolan Caudill",
+      "url": "https://github.com/mncaudill/3bitdither"
+    },
+    {
+      "name": "J. Kirchartz",
+      "email": "me@jkirchartz.com",
+      "url": "http://jkirchartz.com"
+    }
+  ],
+  "dependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "commander": "^2.11.0",
+    "express": "^5.2.1",
+    "jimp": "^0.2.27",
+    "svelte": "^5.57.0",
+    "vite": "^8.2.2"
+  },
+  "devDependencies": {
+    "grunt": "^1.0.1",
+    "grunt-contrib-concat": "^1.0.1",
+    "grunt-contrib-jshint": "^1.1.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "node --check index.js bin/gleech src/main.js src/core/glitch-engine.js src/core/canvas-utils.js src/workers/glitch.worker.js src/workers/worker-pool.js",
+    "test": "node --check index.js && ./bin/gleech list && node -e \"import('./index.js').then(m => console.log('gleech OK with', m.gleech.all.length, 'algorithms'))\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/jkirchartz/Glitchy3bitDither.git"
+  },
+  "keywords": [
+    "glitch",
+    "images",
+    "image processing",
+    "aesthetic"
+  ],
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/jkirchartz/Glitchy3bitDither/issues"
+  },
+  "homepage": "https://github.com/jkirchartz/Glitchy3bitDither#readme"
+}

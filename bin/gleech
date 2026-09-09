@@ -1,0 +1,217 @@
+#!/usr/bin/env node
+'use strict';
+/*
+ * Gleech CLI
+ * Copyright (C) 2017-2026 jkirchartz <me@jkirchartz.com>
+ *
+ * Distributed under terms of the GPL3.0 license.
+ */
+import { readFileSync } from 'fs';
+import { gleech } from '../index.js';
+
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+
+const algorithmCategories = gleech.categories || {
+  presets: ['theWorks', 'randomGlitch', 'glitch', 'preset1', 'preset2', 'preset3', 'preset4'],
+  dithering: ['ditherFloydSteinberg', 'ditherAtkinsons', 'ditherBayer', 'ditherBayer3', 'dither8Bit', 'ditherHalftone', 'ditherBitmask', 'ditherRandom', 'ditherRandom3'],
+  pixelSorting: ['pixelFunk', 'superPixelFunk', 'sort', 'shortsort', 'shortdumbsort', 'slicesort', 'sortStripe', 'sortRows', 'randomSortRows', 'dumbSortRows', 'pixelSort'],
+  geometry: ['slice', 'slice2', 'slice3', 'superSlice', 'superSlice2', 'scanlines', 'focusImage', 'fractal', 'fractal2', 'fractalGhosts', 'fractalGhosts2', 'fractalGhosts3', 'fractalGhosts4'],
+  analogCRT: ['DrumrollHorizontal', 'DrumrollVertical', 'DrumrollHorizontalWave', 'DrumrollVerticalWave'],
+  colorShifts: ['rgb_glitch', 'superShift', 'colorShift', 'colorShift2', 'redShift', 'greenShift', 'blueShift', 'invert']
+};
+
+function printHelp() {
+  console.log(`
+Gleech CLI v${pkg.version}
+${pkg.description || 'Universal image glitching and 3-bit dithering engine in Node.js'}
+
+Usage:
+  gleech <algorithm> <input> <output> [parameters...]
+  gleech <input> <output> [algorithm] [parameters...]
+  gleech list
+  gleech info <algorithm>
+
+Examples:
+  gleech theWorks photo.jpg glitched.png
+  gleech pixelFunk photo.jpg funky.png 8
+  gleech ditherFloydSteinberg photo.jpg dithered.png
+  gleech photo.jpg output.png DrumrollHorizontal
+
+Commands:
+  list                List all available algorithms grouped by category
+  info <algorithm>    Show details and parameters for a specific algorithm
+  help, -h, --help    Show this help message
+  -v, --version       Show version number
+`);
+}
+
+function printList() {
+  console.log(`\n=== Gleech Algorithms (${gleech.all.length} total) ===\n`);
+
+  const categoryLabels = {
+    presets: 'Presets',
+    jpegCorrupt: 'JPEG & Anti-JPEG Corruption',
+    digitalTV: 'Digital TV & Broadcast',
+    analogCRT: 'Analog TV & CRT',
+    dithering: 'Dithering',
+    pixelSorting: 'Pixel Sorting',
+    geometry: 'Geometry & Slicing',
+    colorShifts: 'Color Shifts'
+  };
+
+  for (const [catKey, list] of Object.entries(algorithmCategories)) {
+    const label = categoryLabels[catKey] || catKey;
+    console.log(`${label} (${list.length}):`);
+    console.log('  ' + list.join(', ') + '\n');
+  }
+
+  console.log('Usage example:');
+  console.log('  gleech pixelFunk input.jpg output.png 8');
+  console.log('  gleech jpegBlockRot input.jpg output.png');
+  console.log('  gleech vcrTracking input.jpg output.png\n');
+}
+
+function printInfo(op) {
+  if (!gleech.all.includes(op)) {
+    console.error(`[gleech] Error: Algorithm "${op}" is not recognized. Run "gleech list" for available options.`);
+    process.exit(1);
+  }
+
+  let catName = 'Glitch';
+  for (const [cat, list] of Object.entries(algorithmCategories)) {
+    if (list.includes(op)) {
+      catName = cat.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+      break;
+    }
+  }
+
+  console.log(`\nAlgorithm: ${op}`);
+  console.log(`Category:  ${catName}`);
+  console.log(`CLI:       gleech ${op} input.jpg output.png`);
+  console.log(`Callable:  gleech.${op}(imageData) or img.${op}()`);
+  console.log('');
+}
+
+async function executeGlitch(input, output, op, rawParams = []) {
+  try {
+    const algorithm = op || 'theWorks';
+
+    if (typeof gleech[algorithm] !== 'function') {
+      console.error(`[gleech] Error: Algorithm "${algorithm}" not found. Run "gleech list" to see available algorithms.`);
+      process.exit(1);
+    }
+
+    const parsedParams = rawParams.map(p => {
+      const num = parseFloat(p);
+      return isNaN(num) ? p : num;
+    });
+
+    console.log(`[gleech] Loading: ${input}`);
+    const startTime = performance.now();
+    const image = await gleech.read(input);
+    const width = image.bitmap.width;
+    const height = image.bitmap.height;
+
+    console.log(`[gleech] Applying "${algorithm}" on ${width}x${height}px image...`);
+
+    if (parsedParams.length > 0) {
+      image[algorithm](...parsedParams);
+    } else {
+      image[algorithm]();
+    }
+
+    await image.writeAsync(output);
+    const duration = Math.round((performance.now() - startTime) * 10) / 10;
+    console.log(`[gleech] Glitched image saved to ${output} (${duration}ms)`);
+  } catch (err) {
+    console.error(`[gleech] Failure:`, err.message || err);
+    process.exit(1);
+  }
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+
+  if (args.length === 0 || args[0] === '-h' || args[0] === '--help' || args[0] === 'help') {
+    printHelp();
+    process.exit(0);
+  }
+
+  if (args[0] === '-v' || args[0] === '--version') {
+    console.log(`v${pkg.version}`);
+    process.exit(0);
+  }
+
+  if (args[0] === 'list') {
+    printList();
+    process.exit(0);
+  }
+
+  if (args[0] === 'info') {
+    if (!args[1]) {
+      console.error('[gleech] Error: Please specify an algorithm name: gleech info <algorithm>');
+      process.exit(1);
+    }
+    printInfo(args[1]);
+    process.exit(0);
+  }
+
+  // Backward-compatibility: gleech glitch <input> <output> [algorithm] [parameters...]
+  if (args[0] === 'glitch') {
+    const input = args[1];
+    const output = args[2];
+    const op = args[3] || 'theWorks';
+    const params = args.slice(4);
+    if (!input || !output) {
+      console.error('[gleech] Error: Missing input or output file.\nUsage: gleech glitch <input> <output> [algorithm] [parameters...]');
+      process.exit(1);
+    }
+    await executeGlitch(input, output, op, params);
+    process.exit(0);
+  }
+
+  // Preferred direct syntax: gleech <algorithm> <input> <output> [parameters...]
+  // e.g. gleech theWorks input.jpg output.png
+  // e.g. gleech pixelFunk input.jpg output.png 8
+  if (gleech.all.includes(args[0]) || typeof gleech[args[0]] === 'function') {
+    const op = args[0];
+    const input = args[1];
+    const output = args[2];
+    const params = args.slice(3);
+    if (!input || !output) {
+      console.error(`[gleech] Error: Missing input or output file for algorithm "${op}".\nUsage: gleech ${op} <input> <output> [parameters...]`);
+      process.exit(1);
+    }
+    await executeGlitch(input, output, op, params);
+    process.exit(0);
+  }
+
+  // Alternative syntax: gleech <input> <output> [algorithm] [parameters...]
+  // e.g. gleech photo.jpg out.png
+  // e.g. gleech photo.jpg out.png ditherFloydSteinberg
+  if (args.length >= 2) {
+    const input = args[0];
+    const output = args[1];
+    let op = 'theWorks';
+    let params = [];
+
+    if (args[2]) {
+      if (gleech.all.includes(args[2]) || typeof gleech[args[2]] === 'function') {
+        op = args[2];
+        params = args.slice(3);
+      } else {
+        console.error(`[gleech] Error: Unknown algorithm "${args[2]}". Run "gleech list" to see available algorithms.`);
+        process.exit(1);
+      }
+    }
+
+    await executeGlitch(input, output, op, params);
+    process.exit(0);
+  }
+
+  console.error(`[gleech] Error: Unrecognized command or arguments: "${args.join(' ')}"\nRun "gleech --help" for usage.`);
+  process.exit(1);
+}
+
+main();
+

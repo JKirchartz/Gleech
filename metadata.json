@@ -1,0 +1,8 @@
+{
+  "name": "Gleech",
+  "description": "Universal image glitching and 3-bit dithering engine for Node.js and browser canvas (fork of Glitchy3bitDither)",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
