@@ -43,7 +43,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node -e \"const fs=require('fs'); fs.writeFileSync('docs/.nojekyll', ''); fs.cpSync('docs', 'dist', {recursive:true});\"",
     "preview": "vite preview",
     "lint": "node --check index.js bin/gleech src/main.js src/core/glitch-engine.js src/core/canvas-utils.js src/workers/glitch.worker.js src/workers/worker-pool.js",
     "test": "node --check index.js && ./bin/gleech list && node -e \"import('./index.js').then(m => console.log('gleech OK with', m.gleech.all.length, 'algorithms'))\""

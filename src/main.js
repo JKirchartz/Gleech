@@ -13,21 +13,17 @@ if (typeof window !== 'undefined') {
   window.glitchWorkerPool = workerPool;
 
   // Set active nav highlighting matching style.css:
-  // e.g., body#index, body#glitch, body#GlitchCruiser, body#GlitchChooser
+  // e.g., body#Documentation, body#glitch, body#GlitchCruiser, body#GlitchChooser
   const path = window.location.pathname;
-  let pageId = 'index';
   if (path.includes('GlitchCruiser')) {
-    pageId = 'GlitchCruiser';
+    document.body.id = 'GlitchCruiser';
   } else if (path.includes('GlitchChooser')) {
-    pageId = 'GlitchChooser';
+    document.body.id = 'GlitchChooser';
   } else if (path.includes('glitch.')) {
-    pageId = 'glitch';
-  } else if (path.includes('gleech.js')) {
-    pageId = 'Documentation';
+    document.body.id = 'glitch';
   } else {
-    pageId = 'index';
+    document.body.id = 'Documentation';
   }
-  document.body.id = pageId;
 
   // Legacy helper function drawDitherResult for backward compatibility
   window.drawDitherResult = function(canvas, ditherer, text, append) {

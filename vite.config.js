@@ -3,6 +3,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { resolve } from 'path';
 
 export default defineConfig({
+  base: './',
   plugins: [
     svelte({
       compilerOptions: {
@@ -16,7 +17,8 @@ export default defineConfig({
     strictPort: true
   },
   build: {
-    outDir: 'dist',
+    outDir: 'docs',
+    emptyOutDir: true,
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
