@@ -5,7 +5,8 @@
  * Distributed under terms of the GPL 3.0 (General Public License) license.
  */
 
-import { gleech } from '../index.js';
+'use strict';
+var gleech = require('../dist/gleech.js');
 
 
 gleech.read('./test.jpg', function (err, img) {
