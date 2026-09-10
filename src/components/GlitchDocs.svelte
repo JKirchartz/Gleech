@@ -3,6 +3,7 @@
 <script>
   import { onMount } from 'svelte';
   import { gleech } from '../core/glitch-engine.js';
+  import { algorithmParams } from '../core/algorithm-params.js';
   import { workerPool } from '../workers/worker-pool.js';
   import { createDefaultTestImage, resultToDataUrl } from '../core/canvas-utils.js';
 
@@ -10,10 +11,62 @@
   let isTesting = false;
   let testDuration = 0;
   let previewUrl = '';
+  let originalSampleUrl = '';
   let sampleImageData = null;
   let activeFilter = 'all';
   let searchQuery = '';
   let copiedCommand = '';
+  let currentOptions = {};
+
+  $: {
+    const schema = algorithmParams[selectedAlgorithm];
+    const initialOpts = {};
+    if (schema && schema.params) {
+      for (const p of schema.params) {
+        initialOpts[p.id] = p.default;
+      }
+    }
+    currentOptions = initialOpts;
+  }
+
+  function updateParam(id, val) {
+    currentOptions = {
+      ...currentOptions,
+      [id]: val
+    };
+  }
+
+  function resetParamsToDefault() {
+    const schema = algorithmParams[selectedAlgorithm];
+    const initialOpts = {};
+    if (schema && schema.params) {
+      for (const p of schema.params) {
+        initialOpts[p.id] = p.default;
+      }
+    }
+    currentOptions = initialOpts;
+  }
+
+  function resetInteractiveTest() {
+    if (originalSampleUrl) {
+      previewUrl = originalSampleUrl;
+      testDuration = 0;
+    }
+  }
+
+  $: dynamicCliCommand = (() => {
+    let cmd = `gleech ${selectedAlgorithm} input.jpg output.png`;
+    const schema = algorithmParams[selectedAlgorithm];
+    if (schema && schema.params) {
+      for (const p of schema.params) {
+        const val = currentOptions[p.id];
+        if (val !== undefined && val !== 'auto') {
+          cmd += ` --${p.id}=${val}`;
+        }
+      }
+    }
+    return cmd;
+  })();
 
   const algorithmDetails = {
     theWorks: { category: 'preset', desc: 'Randomly shuffles and cascades multiple non-sorting glitch filters for a complete overhaul.' },
@@ -122,12 +175,14 @@
     if (!sampleImageData) {
       const sample = createDefaultTestImage(240, 240);
       sampleImageData = sample.imageData;
+      originalSampleUrl = sample.dataUrl;
     }
     isTesting = true;
     try {
       const res = await workerPool.run({
         algorithm: algo,
         imageData: sampleImageData,
+        options: { ...currentOptions },
         useOffscreen: true
       });
       testDuration = res.duration;
@@ -150,6 +205,7 @@
   onMount(() => {
     const sample = createDefaultTestImage(240, 240);
     sampleImageData = sample.imageData;
+    originalSampleUrl = sample.dataUrl;
     previewUrl = sample.dataUrl;
   });
 </script>
@@ -242,6 +298,77 @@
           </p>
         {/if}
 
+        {#if algorithmParams[selectedAlgorithm] && algorithmParams[selectedAlgorithm].params && algorithmParams[selectedAlgorithm].params.length > 0}
+          <div class="params-box">
+            <div class="params-header">
+              <span class="params-title">Editable Parameters</span>
+              <button type="button" class="btn-subtle-reset" on:click={resetParamsToDefault}>
+                Reset to Random Defaults
+              </button>
+            </div>
+            <div class="params-grid">
+              {#each algorithmParams[selectedAlgorithm].params as param}
+                <div class="param-row">
+                  <div class="param-label-group">
+                    <span class="param-label">{param.label}</span>
+                    <span class="param-hint">
+                      {currentOptions[param.id] === 'auto' ? `(Auto: ${param.defaultHint || 'randomized'})` : (param.type === 'boolean' ? '' : currentOptions[param.id])}
+                    </span>
+                  </div>
+
+                  {#if param.type === 'range'}
+                    <div class="param-input-group">
+                      <input
+                        type="range"
+                        min={param.min}
+                        max={param.max}
+                        step={param.step || 1}
+                        value={currentOptions[param.id] === 'auto' ? Math.round((param.min + param.max) / 2) : currentOptions[param.id]}
+                        on:input={(e) => updateParam(param.id, Number(e.target.value))}
+                      />
+                      <button
+                        type="button"
+                        class="btn-auto"
+                        class:active={currentOptions[param.id] === 'auto'}
+                        on:click={() => updateParam(param.id, currentOptions[param.id] === 'auto' ? Math.round((param.min + param.max) / 2) : 'auto')}
+                        title="Toggle between automatic randomized value and user-fixed value"
+                      >
+                        {currentOptions[param.id] === 'auto' ? 'Auto ⚄' : 'Manual'}
+                      </button>
+                    </div>
+                  {:else if param.type === 'select'}
+                    <div class="param-input-group">
+                      <select
+                        class="param-select"
+                        value={currentOptions[param.id]}
+                        on:change={(e) => updateParam(param.id, e.target.value)}
+                      >
+                        {#if param.default === 'auto'}
+                          <option value="auto">Auto (Randomized)</option>
+                        {/if}
+                        {#each param.options as opt}
+                          <option value={opt}>{opt}</option>
+                        {/each}
+                      </select>
+                    </div>
+                  {:else if param.type === 'boolean'}
+                    <div class="param-input-group">
+                      <label class="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={currentOptions[param.id] === true || currentOptions[param.id] === 'true'}
+                          on:change={(e) => updateParam(param.id, e.target.checked)}
+                        />
+                        <span>Enabled</span>
+                      </label>
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
         <div class="btn-row">
           <button type="button" class="btn-primary" on:click={() => runInteractiveTest(selectedAlgorithm)} disabled={isTesting}>
             {isTesting ? 'Processing...' : 'Run Algorithm'}
@@ -249,12 +376,15 @@
           <button type="button" class="btn-secondary" on:click={() => runInteractiveTest('theWorks')}>
             Surprise Me (theWorks)
           </button>
+          <button type="button" class="btn-reset" on:click={resetInteractiveTest} disabled={isTesting} title="Reset to original test image">
+            Reset Image
+          </button>
         </div>
 
         <div class="cli-snippet">
-          <code>gleech {selectedAlgorithm} input.jpg output.png</code>
-          <button type="button" class="btn-copy" on:click={() => copyToClipboard(`gleech ${selectedAlgorithm} input.jpg output.png`)}>
-            {copiedCommand.includes(selectedAlgorithm) ? 'Copied!' : 'Copy CLI'}
+          <code>{dynamicCliCommand}</code>
+          <button type="button" class="btn-copy" on:click={() => copyToClipboard(dynamicCliCommand)}>
+            {copiedCommand === dynamicCliCommand ? 'Copied!' : 'Copy CLI'}
           </button>
         </div>
       </div>
@@ -583,6 +713,124 @@ self.onmessage = (e) =&gt; &#123;
   }
   .btn-secondary:hover {
     background: #555;
+  }
+  .btn-reset {
+    background: #542222;
+    color: #fcc;
+    border: 1px solid #733333;
+    padding: 0.6em 1.2em;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-reset:hover {
+    background: #733333;
+    color: #fff;
+  }
+  .btn-reset:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .params-box {
+    background: #fbfbfb;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0.85em 1em;
+    margin-bottom: 1em;
+  }
+  .params-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75em;
+    padding-bottom: 0.35em;
+    border-bottom: 1px solid #eaeaea;
+  }
+  .params-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #444;
+  }
+  .btn-subtle-reset {
+    font-size: 0.78em;
+    background: none;
+    border: none;
+    color: #08a;
+    padding: 2px 4px;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .btn-subtle-reset:hover {
+    color: #057;
+  }
+  .params-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+  }
+  .param-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+  }
+  .param-label-group {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85em;
+  }
+  .param-label {
+    font-weight: 600;
+    color: #333;
+  }
+  .param-hint {
+    color: #666;
+    font-family: monospace;
+    font-size: 0.88em;
+  }
+  .param-input-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+  .param-input-group input[type="range"] {
+    flex: 1;
+    margin: 0;
+    cursor: pointer;
+  }
+  .btn-auto {
+    background: #eee;
+    color: #555;
+    border: 1px solid #ccc;
+    font-size: 0.75em;
+    padding: 0.25em 0.6em;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-auto.active {
+    background: #0ac;
+    color: #fff;
+    border-color: #08a;
+    font-weight: bold;
+  }
+  .param-select {
+    width: 100%;
+    padding: 0.4em;
+    font-size: 0.9em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 0 !important;
+  }
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    font-size: 0.88em;
+    cursor: pointer;
+    margin-bottom: 0 !important;
   }
   .cli-snippet {
     display: flex;

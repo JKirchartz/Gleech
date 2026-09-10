@@ -31,6 +31,7 @@
   "dependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "commander": "^2.11.0",
+    "dat.gui": "^0.7.9",
     "jimp": "^0.2.27",
     "svelte": "^5.57.0",
     "vite": "^8.2.2"

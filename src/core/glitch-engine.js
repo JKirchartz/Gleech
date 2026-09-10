@@ -1,3 +1,5 @@
+import { algorithmParams } from './algorithm-params.js';
+
 var gleech = (function(gleech) {
   'use strict';
   var imageData, originalImageData;
@@ -24,6 +26,10 @@ var gleech = (function(gleech) {
     ...gleech.categories.colorShifts
   ];
 
+  /* Structured parameter metadata and configurable controls for all 68 glitch commands */
+  gleech.commands = algorithmParams;
+  gleech.parameters = algorithmParams;
+
   gleech.init = function init(data) {
     if ( data.toString() !== "[object ImageData]" ) {
       throw new Error('Gleech expects ImageData');
@@ -42,6 +48,36 @@ var gleech = (function(gleech) {
     data[i] = data[i] + multiplier * error[0];
     data[i + 1] = data[i + 1] + multiplier * error[1];
     data[i + 2] = data[i + 2] + multiplier * error[2];
+  }
+
+  /**
+   * Helper to retrieve parameter options with sensible fallbacks:
+   * 1. If options[key] is defined and not 'auto', parse and return it.
+   * 2. Otherwise execute fallbackFn() (if provided) or return fallbackVal.
+   */
+  function getOpt(options, key, fallbackFn, fallbackVal) {
+    if (options !== undefined && options !== null) {
+      if (typeof options === 'object') {
+        if (options[key] !== undefined && options[key] !== 'auto' && options[key] !== '') {
+          var v = options[key];
+          if (typeof fallbackVal === 'number' || (typeof fallbackFn === 'function' && typeof fallbackFn() === 'number')) {
+            var num = Number(v);
+            if (!isNaN(num)) return num;
+          }
+          if (typeof fallbackVal === 'boolean') {
+            if (typeof v === 'boolean') return v;
+            if (typeof v === 'string') return v === 'true' || v === '1';
+          }
+          return v;
+        }
+      } else if (typeof options === 'number' || typeof options === 'boolean' || typeof options === 'string') {
+        if (options !== 'auto') {
+          var asNum = Number(options);
+          return !isNaN(asNum) ? asNum : options;
+        }
+      }
+    }
+    return typeof fallbackFn === 'function' ? fallbackFn() : fallbackVal;
   }
 
   // return random # < a
@@ -140,11 +176,12 @@ var gleech = (function(gleech) {
    * Dithering
    ***************************************************/
 
-  gleech.dither8Bit = function dither8Bit(imageData) {
+  gleech.dither8Bit = function dither8Bit(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
-      size = 4, sum_r, sum_g, sum_b, avg_r, avg_g, avg_b;
+      size = Math.max(1, Math.round(getOpt(options, 'size', null, 4))),
+      sum_r, sum_g, sum_b, avg_r, avg_g, avg_b;
     for (var y = 0; y < height; y += size) {
       for (var x = 0; x < width; x += size) {
         sum_r = 0;
@@ -175,10 +212,11 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.ditherHalftone = function ditherHalftone(imageData) {
+  gleech.ditherHalftone = function ditherHalftone(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
-      data = imageData.data;
+      data = imageData.data,
+      step = Math.max(2, Math.round(getOpt(options, 'size', null, 3)));
     for (var y = 0; y <= height - 2; y += 3) {
       for (var x = 0; x <= width - 2; x += 3) {
         var sum_r = 0, sum_g = 0, sum_b = 0;
@@ -250,19 +288,20 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.ditherAtkinsons = function ditherAtkinsons(imageData) {
+  gleech.ditherAtkinsons = function ditherAtkinsons(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
-      data = imageData.data;
+      data = imageData.data,
+      threshold = getOpt(options, 'threshold', null, 128);
     for (var y = 0; y < height; y++) {
       for (var x = 0; x < width; x++) {
         var i = 4 * (y * width + x);
         var old_r = data[i];
         var old_g = data[i + 1];
         var old_b = data[i + 2];
-        var new_r = (old_r > 127) ? 0xff : 0;
-        var new_g = (old_g > 127) ? 0xff : 0;
-        var new_b = (old_b > 127) ? 0xff : 0;
+        var new_r = (old_r > threshold) ? 0xff : 0;
+        var new_g = (old_g > threshold) ? 0xff : 0;
+        var new_b = (old_b > threshold) ? 0xff : 0;
         data[i] = new_r;
         data[i + 1] = new_g;
         data[i + 2] = new_b;
@@ -309,19 +348,20 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.ditherFloydSteinberg = function ditherFloydSteinberg(imageData) {
+  gleech.ditherFloydSteinberg = function ditherFloydSteinberg(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
-      data = imageData.data;
+      data = imageData.data,
+      threshold = getOpt(options, 'threshold', null, 128);
     for (var y = 0; y < height; y++) {
       for (var x = 0; x < width; x++) {
         var i = 4 * (y * width + x);
         var old_r = data[i];
         var old_g = data[i + 1];
         var old_b = data[i + 2];
-        var new_r = (old_r > 127) ? 0xff : 0;
-        var new_g = (old_g > 127) ? 0xff : 0;
-        var new_b = (old_b > 127) ? 0xff : 0;
+        var new_r = (old_r > threshold) ? 0xff : 0;
+        var new_g = (old_g > threshold) ? 0xff : 0;
+        var new_b = (old_b > threshold) ? 0xff : 0;
         data[i] = new_r;
         data[i + 1] = new_g;
         data[i + 2] = new_b;
@@ -359,11 +399,10 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.ditherBayer = function ditherBayer(imageData) {
+  gleech.ditherBayer = function ditherBayer(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
-      /* added more threshold maps and the randomizer, the rest is stock */
     threshold_maps = [
       [
         [3, 7, 4],
@@ -387,7 +426,8 @@ var gleech = (function(gleech) {
         [43, 27, 39, 23, 42, 26, 38, 22]
       ]
     ],
-    threshold_map = threshold_maps[randFloor(threshold_maps.length)],
+    mapIdx = getOpt(options, 'mapIndex', function() { return randFloor(threshold_maps.length); }),
+    threshold_map = threshold_maps[Math.abs(mapIdx) % threshold_maps.length],
       size = threshold_map.length;
     for (var y = 0; y < height; y++) {
       for (var x = 0; x < width; x++) {
@@ -401,11 +441,10 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.ditherBayer3 = function ditherBayer3(imageData) {
+  gleech.ditherBayer3 = function ditherBayer3(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
-      /* adding in more threshold maps, and the randomizer */
     threshold_maps = [
       [
         [3, 7, 4],
@@ -429,7 +468,8 @@ var gleech = (function(gleech) {
         [43, 27, 39, 23, 42, 26, 38, 22]
       ]
     ],
-    threshold_map = threshold_maps[randFloor(threshold_maps.length)],
+    mapIdx = getOpt(options, 'mapIndex', function() { return randFloor(threshold_maps.length); }),
+    threshold_map = threshold_maps[Math.abs(mapIdx) % threshold_maps.length],
       size = threshold_map.length;
     for (var y = 0; y < height; y++) {
       for (var x = 0; x < width; x++) {
@@ -446,35 +486,38 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.ditherRandom = function ditherRandom(imageData) {
+  gleech.ditherRandom = function ditherRandom(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
-      data = imageData.data;
+      data = imageData.data,
+      userThresh = getOpt(options, 'threshold', null, null);
     for (var i = 0, val, scaled, size = width * height * 4; i < size; i += 4) {
       scaled = ((data[i] + data[i + 1] + data[i + 2]) / 3) % 255;
-      val = scaled < randRound(128) ? 0 : 0xff;
+      val = scaled < (userThresh !== null && userThresh !== undefined ? userThresh : randRound(128)) ? 0 : 0xff;
       data[i] = data[i + 1] = data[i + 2] = val;
     }
     return imageData;
   };
 
-  gleech.ditherRandom3 = function ditherRandom3(imageData) {
+  gleech.ditherRandom3 = function ditherRandom3(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
-      data = imageData.data;
+      data = imageData.data,
+      userThresh = getOpt(options, 'threshold', null, null);
     for (var i = 0, size = width * height * 4; i < size; i += 4) {
-      data[i] = data[i] < randRound(128) ? 0 : 0xff;
-      data[i + 1] = data[i + 1] < randRound(128) ? 0 : 0xff;
-      data[i + 2] = data[i + 2] < randRound(128) ? 0 : 0xff;
+      var t = userThresh !== null && userThresh !== undefined ? userThresh : randRound(128);
+      data[i] = data[i] < t ? 0 : 0xff;
+      data[i + 1] = data[i + 1] < t ? 0 : 0xff;
+      data[i + 2] = data[i + 2] < t ? 0 : 0xff;
     }
     return imageData;
   };
 
-  gleech.ditherBitmask = function ditherBitmask(imageData) {
+  gleech.ditherBitmask = function ditherBitmask(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
-      M = randRange(1, 125);
+      M = Math.round(getOpt(options, 'mask', function() { return randRange(1, 125); }));
     // 0xc0; 2 bits
     // 0xe0  3 bits
     // 0xf0  4 bits
@@ -493,11 +536,12 @@ var gleech = (function(gleech) {
   /***************************************************
    * Glitch
    ***************************************************/
-  gleech.colorShift = function colorShift(imageData) {
+  gleech.colorShift = function colorShift(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
-      dir = coinToss();
+      mode = getOpt(options, 'mode', null, 'random'),
+      dir = mode === 'forward' ? true : (mode === 'reverse' ? false : coinToss());
     for (var i = 0, size = width * height * 4; i < size; i += 4) {
       var r = data[i],
         g = data[i + 1],
@@ -508,11 +552,12 @@ var gleech = (function(gleech) {
     }
     return imageData;
   };
-  gleech.colorShift2 = function colorShift2(imageData) {
+  gleech.colorShift2 = function colorShift2(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = new Uint32Array(imageData.data.buffer),
-      dir = coinToss();
+      mode = getOpt(options, 'mode', null, 'random'),
+      dir = mode === 'forward' ? true : (mode === 'reverse' ? false : coinToss());
     for (var i = 0, size = data.length; i < size; i++) {
       var a = data[i] >> 24 & 0xFF,
         r = data[i] >> 16 & 0xFF,
@@ -526,11 +571,11 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.greenShift = function greenShift(imageData) {
+  gleech.greenShift = function greenShift(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
-      factor = randFloor(64);
+      factor = Math.round(getOpt(options, 'amount', function() { return randFloor(64); }));
     for (var i = 0, size = width * height * 4; i < size; i += 4) {
       var shift = data[i + 1] + factor;
       data[i] -= factor;
@@ -540,11 +585,11 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.redShift = function redShift(imageData) {
+  gleech.redShift = function redShift(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
-      factor = randFloor(64);
+      factor = Math.round(getOpt(options, 'amount', function() { return randFloor(64); }));
     for (var i = 0, size = width * height * 4; i < size; i += 4) {
       var shift = data[i] + factor;
       data[i] = (shift) > 255 ? 255 : shift;
@@ -554,11 +599,11 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.blueShift = function blueShift(imageData) {
+  gleech.blueShift = function blueShift(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
-      factor = randFloor(64);
+      factor = Math.round(getOpt(options, 'amount', function() { return randFloor(64); }));
     for (var i = 0, size = width * height * 4; i < size; i += 4) {
       var shift = data[i + 2] + factor;
       data[i] -= factor;
@@ -568,9 +613,10 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.superShift = function superShift(imageData) {
-    for (var i = 0, l = randRange(1, 10); i < l; i++) {
-      imageData = gleech.colorShift(imageData);
+  gleech.superShift = function superShift(imageData, options) {
+    var l = Math.max(1, Math.round(getOpt(options, 'shift', function() { return randRange(1, 10); })));
+    for (var i = 0; i < l; i++) {
+      imageData = gleech.colorShift(imageData, options);
     }
     return imageData;
   };
@@ -588,16 +634,18 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.superPixelFunk = function superPixelFunk(imageData) {
+  gleech.superPixelFunk = function superPixelFunk(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
       height = imageData.height,
       width = imageData.width,
-      pixelation = randRange(2, 15);
+      pixelation = Math.max(1, Math.round(getOpt(options, 'pixelation', function() { return randRange(2, 15); }))),
+      chance = getOpt(options, 'chance', null, 50),
+      colorOpt = getOpt(options, 'color', null, 'random');
     for (var y = 0; y < height; y += pixelation) {
       for (var x = 0; x < width; x += pixelation) {
-        if (coinToss()) {
+        if (randChance(chance)) {
           var locale = coinToss();
-          var mask = randChoice([0x00FF0000, 0x0000FF00, 0x000000FF]);
+          var mask = colorOpt === 'red' ? 0x00FF0000 : (colorOpt === 'green' ? 0x0000FF00 : (colorOpt === 'blue' ? 0x000000FF : randChoice([0x00FF0000, 0x0000FF00, 0x000000FF])));
           var i = coinToss() ? (y * width + x) :
             (y * width + (x - (pixelation * 2)));
           for (var n = 0; n < pixelation; n++) {
@@ -614,14 +662,15 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.pixelFunk = function pixelFunk(imageData) {
+  gleech.pixelFunk = function pixelFunk(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
       height = imageData.height,
       width = imageData.width,
-      pixelation = randRange(2, 10);
+      pixelation = Math.max(1, Math.round(getOpt(options, 'pixelation', function() { return randRange(2, 10); }))),
+      chance = getOpt(options, 'chance', null, 50);
     for (var y = 0; y < height; y += pixelation) {
       for (var x = 0; x < width; x += pixelation) {
-        if (coinToss()) {
+        if (randChance(chance)) {
           var i = (y * width + x);
           for (var n = 0; n < pixelation; n++) {
             for (var m = 0; m < pixelation; m++) {
@@ -636,11 +685,11 @@ var gleech = (function(gleech) {
     }
     return imageData;
   };
-  gleech.focusImage = function focusImage(imageData) {
+  gleech.focusImage = function focusImage(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
       height = imageData.height,
       width = imageData.width,
-      pixelation = randRange(2, 10);
+      pixelation = Math.max(1, Math.round(getOpt(options, 'radius', function() { return randRange(2, 10); })));
     for (var y = 0; y < height; y += pixelation) {
       for (var x = 0; x < width; x += pixelation) {
         var i = (y * width + x);
@@ -657,23 +706,27 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.slice = function slice(imageData) {
+  gleech.slice = function slice(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
-      cutend = randFloor(width * height * 4),
-      cutstart = Math.floor(cutend / 1.7),
-      cut = data.subarray(cutstart, cutend);
-    data.set(cut, randFloor((width * height * 4) - cut.length));
+      slices = Math.max(1, Math.round(getOpt(options, 'slices', null, 1)));
+    for (var s = 0; s < slices; s++) {
+      var cutend = randFloor(width * height * 4),
+        cutstart = Math.floor(cutend / 1.7),
+        cut = data.subarray(cutstart, cutend);
+      data.set(cut, randFloor((width * height * 4) - cut.length));
+    }
     imageData.data.set(data);
     return imageData;
   };
 
-  gleech.slice2 = function slice2(imageData) {
+  gleech.slice2 = function slice2(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
-      data = imageData.data;
-    for (var i = 0, l = randRound(11); i < l; i++) {
+      data = imageData.data,
+      l = Math.max(1, Math.round(getOpt(options, 'slices', function() { return randRound(11); })));
+    for (var i = 0; i < l; i++) {
       var cutend = Math.random() < 0.75 ? randFloor(width * height * 4) :
         (width * height * 4),
       cutstart = Math.floor(cutend / 1.7),
@@ -685,11 +738,12 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.slice3 = function slice3(imageData) {
+  gleech.slice3 = function slice3(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
-      data = imageData.data;
-    for (var i = 0, l = randRound(20); i < l; i++) {
+      data = imageData.data,
+      l = Math.max(1, Math.round(getOpt(options, 'slices', function() { return randRound(20); })));
+    for (var i = 0; i < l; i++) {
       var cutend = randFloor(width * height * 4),
         cutstart = cutend - randRange(1000, 5100),
         cut = data.subarray(cutstart, cutend);
@@ -701,35 +755,41 @@ var gleech = (function(gleech) {
   };
 
 
-  gleech.superSlice2 = function superSlice2(imageData) {
-    var functs = ['slice', 'slice2', 'slice3'];
-    for (var i = 0, l = randRound(functs.length); i < l; i++) {
+  gleech.superSlice2 = function superSlice2(imageData, options) {
+    var functs = ['slice', 'slice2', 'slice3'],
+      l = Math.max(1, Math.round(getOpt(options, 'iterations', function() { return randRound(functs.length); })));
+    for (var i = 0; i < l; i++) {
       var fun = randFloor(functs.length);
       imageData = gleech[functs[fun]](imageData);
     }
     return imageData;
   };
 
-  gleech.superSlice = function superSlice(imageData) {
-    for (var i = 0, l = randRange(1, 10); i < l; i++) {
+  gleech.superSlice = function superSlice(imageData, options) {
+    var l = Math.max(1, Math.round(getOpt(options, 'iterations', function() { return randRange(1, 10); })));
+    for (var i = 0; i < l; i++) {
       imageData = gleech.slice(gleech.slice2(gleech.slice3(imageData)));
     }
     return imageData;
   };
 
-  gleech.fractalGhosts = function fractalGhosts(imageData) {
-    var data = imageData.data;
-    for (var i = 0; i < data.length; i++) {
-      if (parseInt(data[i * 2 % data.length], 10) < parseInt(data[i], 10)) {
-        data[i] = data[i * 2 % data.length];
+  gleech.fractalGhosts = function fractalGhosts(imageData, options) {
+    var data = imageData.data,
+      ghosts = Math.max(1, Math.round(getOpt(options, 'ghosts', null, 1)));
+    for (var g = 0; g < ghosts; g++) {
+      for (var i = 0; i < data.length; i++) {
+        if (parseInt(data[i * 2 % data.length], 10) < parseInt(data[i], 10)) {
+          data[i] = data[i * 2 % data.length];
+        }
       }
     }
     imageData.data.set(data);
     return imageData;
   };
-  gleech.fractalGhosts2 = function fractalGhosts2(imageData) {
+
+  gleech.fractalGhosts2 = function fractalGhosts2(imageData, options) {
     var data = imageData.data,
-      rand = randRange(1, 10);
+      rand = Math.max(1, Math.round(getOpt(options, 'ghosts', function() { return randRange(1, 10); })));
     for (var i = 0; i < data.length; i++) {
       var tmp = (i * rand) % data.length;
       if (parseInt(data[tmp], 10) < parseInt(data[i], 10)) {
@@ -740,10 +800,10 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.fractalGhosts3 = function fractalGhosts3(imageData) {
+  gleech.fractalGhosts3 = function fractalGhosts3(imageData, options) {
     var data = imageData.data,
-      rand = randRange(1, 10),
-      color = randRange(0, 4);
+      rand = Math.max(1, Math.round(getOpt(options, 'ghosts', function() { return randRange(1, 10); }))),
+      color = Math.round(getOpt(options, 'channel', function() { return randRange(0, 4); }));
     for (var i = 0; i < data.length; i++) {
       if ((i % 4) === color) {
         data[i] = 0xFF;
@@ -758,9 +818,9 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.fractalGhosts4 = function fractalGhosts4(imageData) {
+  gleech.fractalGhosts4 = function fractalGhosts4(imageData, options) {
     var data = imageData.data,
-      color = randRange(0, 4);
+      color = Math.round(getOpt(options, 'channel', function() { return randRange(0, 4); }));
     for (var i = 0; i < data.length; i++) {
       if ((i % 4) === color) {
         data[i] = 0xFF;
@@ -773,18 +833,21 @@ var gleech = (function(gleech) {
     imageData.data.set(data);
     return imageData;
   };
-  gleech.fractal = function fractal(imageData) {
-    var data = new Uint32Array(imageData.data.buffer);
-    for (var i = data.length; i; i--) {
-      if (parseInt(data[(i * 2) % data.length], 10) < parseInt(data[i], 10)) {
-        data[i] = data[(i * 2) % data.length];
+  gleech.fractal = function fractal(imageData, options) {
+    var data = new Uint32Array(imageData.data.buffer),
+      passes = Math.max(1, Math.round(getOpt(options, 'passes', null, 1)));
+    for (var p = 0; p < passes; p++) {
+      for (var i = data.length; i; i--) {
+        if (parseInt(data[(i * 2) % data.length], 10) < parseInt(data[i], 10)) {
+          data[i] = data[(i * 2) % data.length];
+        }
       }
     }
     return imageData;
   };
-  gleech.fractal2 = function fractal2(imageData) {
+  gleech.fractal2 = function fractal2(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer);
-    var m = randRange(2, 8);
+    var m = Math.max(2, Math.round(getOpt(options, 'passes', function() { return randRange(2, 8); })));
     for (var i = 0; i < data.length; i++) {
       if (parseInt(data[(i * m) % data.length], 10) < parseInt(data[i], 10)) {
         data[i] = data[(i * m) % data.length];
@@ -792,55 +855,68 @@ var gleech = (function(gleech) {
     }
     return imageData;
   };
-  gleech.shortsort = function shortsort(imageData) {
+  gleech.shortsort = function shortsort(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
-      mm = randMinMax(0, imageData.height * imageData.width), cut;
-    mm = randMinMax2(mm[0], mm[1]);
-    cut = data.subarray(mm[0], mm[1]);
-    if (coinToss()) {
-      Array.prototype.sort.call(cut, leftSort);
-    } else {
-      Array.prototype.sort.call(cut, rightSort);
+      segments = Math.max(1, Math.round(getOpt(options, 'segments', null, 1)));
+    for (var s = 0; s < segments; s++) {
+      var mm = randMinMax(0, imageData.height * imageData.width);
+      mm = randMinMax2(mm[0], mm[1]);
+      var cut = data.subarray(mm[0], mm[1]);
+      if (coinToss()) {
+        Array.prototype.sort.call(cut, leftSort);
+      } else {
+        Array.prototype.sort.call(cut, rightSort);
+      }
     }
     imageData.data.set(data.buffer);
     return imageData;
   };
-  gleech.shortdumbsort = function shortdumbsort(imageData) {
+  gleech.shortdumbsort = function shortdumbsort(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
-      mm = randMinMax(0, imageData.width * imageData.height), da;
-    mm = randMinMax2(mm[0], mm[1]);
-    da = data.subarray(mm[0], mm[1]);
-    Array.prototype.sort.call(da);
-    imageData.data.set(da, mm[0]);
+      segments = Math.max(1, Math.round(getOpt(options, 'segments', null, 1)));
+    for (var s = 0; s < segments; s++) {
+      var mm = randMinMax(0, imageData.width * imageData.height);
+      mm = randMinMax2(mm[0], mm[1]);
+      var da = data.subarray(mm[0], mm[1]);
+      Array.prototype.sort.call(da);
+      imageData.data.set(da, mm[0]);
+    }
     return imageData;
   };
 
-  gleech.sort = function sort(imageData) {
-    var data = new Uint32Array(imageData.data.buffer);
-    if (coinToss()) {
+  gleech.sort = function sort(imageData, options) {
+    var data = new Uint32Array(imageData.data.buffer),
+      dir = getOpt(options, 'direction', null, 'auto');
+    if (dir === 'left') {
       Array.prototype.sort.call(data, leftSort);
-    } else {
+    } else if (dir === 'right') {
       Array.prototype.sort.call(data, rightSort);
+    } else {
+      Array.prototype.sort.call(data, coinToss() ? leftSort : rightSort);
     }
     imageData.data.set(data, 0);
     return imageData;
   };
-  gleech.slicesort = function slicesort(imageData) {
+  gleech.slicesort = function slicesort(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
-      mm = randMinMax(0, data.length);
-    mm = randMinMax(mm[0], mm[1]);
-    mm = randMinMax(mm[0], mm[1]);
-    var cut = data.subarray(mm[0], mm[1]),
-      offset = Math.abs(randRound(data.length) - cut.length) % data.length;
-    Array.prototype.sort.call(cut, leftSort);
-    imageData.data.set(data.buffer, coinToss() ? offset : mm[0]);
+      iterations = Math.max(1, Math.round(getOpt(options, 'iterations', null, 1)));
+    for (var it = 0; it < iterations; it++) {
+      var mm = randMinMax(0, data.length);
+      mm = randMinMax(mm[0], mm[1]);
+      mm = randMinMax(mm[0], mm[1]);
+      var cut = data.subarray(mm[0], mm[1]),
+        offset = Math.abs(randRound(data.length) - cut.length) % data.length;
+      Array.prototype.sort.call(cut, leftSort);
+      imageData.data.set(data.buffer, coinToss() ? offset : mm[0]);
+    }
     return imageData;
   };
 
-  gleech.sortRows = function sortRows(imageData) {
+  gleech.sortRows = function sortRows(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
-      width = imageData.width, height = imageData.height;
-    for (var i = 0, size = data.length + 1; i < size; i += width) {
+      width = imageData.width, height = imageData.height,
+      step = Math.max(1, Math.round(getOpt(options, 'step', null, 1)));
+    for (var i = 0, size = data.length + 1; i < size; i += (width * step)) {
       var da = data.subarray(i, i + width);
       Array.prototype.sort.call(da, leftSort);
       da.copyWithin(data, i);
@@ -849,25 +925,29 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.sortStripe = function sortStripe(imageData) {
+  gleech.sortStripe = function sortStripe(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
       width = imageData.width,
-      mm = randMinMax(0, width);
-    mm = randMinMax2(mm[0], mm[1]);
-    for (var i = 0, size = data.length + 1; i < size; i += width) {
-      var da = data.subarray(i + mm[0], i + mm[1]);
-      Array.prototype.sort.call(da, leftSort);
-      da.copyWithin(data, i + mm[0]);
+      stripes = Math.max(1, Math.round(getOpt(options, 'stripes', null, 1)));
+    for (var s = 0; s < stripes; s++) {
+      var mm = randMinMax(0, width);
+      mm = randMinMax2(mm[0], mm[1]);
+      for (var i = 0, size = data.length + 1; i < size; i += width) {
+        var da = data.subarray(i + mm[0], i + mm[1]);
+        Array.prototype.sort.call(da, leftSort);
+        da.copyWithin(data, i + mm[0]);
+      }
     }
     imageData.data.set(data.buffer);
     return imageData;
   };
 
-
-  gleech.dumbSortRows = function dumbSortRows(imageData) {
+  gleech.dumbSortRows = function dumbSortRows(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
-      width = imageData.width, height = imageData.height;
+      width = imageData.width, height = imageData.height,
+      chance = getOpt(options, 'chance', null, 100);
     for (var i = 0, size = data.length; i < size; i += width) {
+      if (!randChance(chance)) continue;
       // var mm = randMinMax(i, i + width);
       // var da = data.subarray(mm[0], mm[1]);
       var da = data.subarray(i, i + width);
@@ -883,10 +963,12 @@ var gleech = (function(gleech) {
     imageData.data.set(data.buffer);
     return imageData;
   };
-  gleech.randomSortRows = function randomSortRows(imageData) {
+  gleech.randomSortRows = function randomSortRows(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
-      width = imageData.width, height = imageData.height;
+      width = imageData.width, height = imageData.height,
+      chance = getOpt(options, 'chance', null, 100);
     for (var i = 0, size = data.length; i < size; i += width) {
+      if (!randChance(chance)) continue;
       // var mm = randMinMax(i, i + width);
       // var da = data.subarray(mm[0], mm[1]);
       var da = data.subarray(i, i + width);
@@ -903,19 +985,29 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.invert = function invert(imageData) {
-    var data = new Uint32Array(imageData.data.buffer);
-    for (var i = 0; i < data.length; i++) {
-      data[i] = ~ data[i] | 0xFF000000;
+  gleech.invert = function invert(imageData, options) {
+    var channel = getOpt(options, 'channel', null, 'all');
+    if (channel === 'all') {
+      var data = new Uint32Array(imageData.data.buffer);
+      for (var i = 0; i < data.length; i++) {
+        data[i] = ~ data[i] | 0xFF000000;
+      }
+      imageData.data.set(data.buffer);
+    } else {
+      var d = imageData.data;
+      var chIdx = channel === 'red' ? 0 : (channel === 'green' ? 1 : 2);
+      for (var j = 0; j < d.length; j += 4) {
+        d[j + chIdx] = 255 - d[j + chIdx];
+      }
     }
-    imageData.data.set(data.buffer);
     return imageData;
   };
-  gleech.rgb_glitch = function rgb_glitch(imageData) {
+  gleech.rgb_glitch = function rgb_glitch(imageData, options) {
     var data = imageData.data,
       width = imageData.width,
       height = imageData.height,
-      mm = randMinMax(10, width - 10),
+      shiftVal = getOpt(options, 'shift', function() { return randRange(10, Math.max(11, width - 10)); }),
+      mm = [shiftVal, shiftVal],
       opt = mm[1] % 3,
       dir = coinToss();
     for (var y = 0; y < height; y++) {
@@ -958,15 +1050,14 @@ var gleech = (function(gleech) {
     imageData.data.set(data);
     return imageData;
   };
-  gleech.DrumrollVerticalWave = function DrumrollVerticalWave(imageData) {
-    /* borrowed from https://github.com/ninoseki/glitched-canvas & modified w/
-     * cosine */
+  gleech.DrumrollVerticalWave = function DrumrollVerticalWave(imageData, options) {
     var data = imageData.data,
       width = imageData.width,
       height = imageData.height,
+      freq = getOpt(options, 'frequency', function() { return 1; }),
       roll = 0;
     for (var x = 0; x < width; x++) {
-      if (Math.random() > 0.95) roll = Math.floor(Math.cos(x) * (height * 2));
+      if (Math.random() > 0.95) roll = Math.floor(Math.cos(x * freq) * (height * 2));
       if (Math.random() > 0.98) roll = 0;
 
       for (var y = 0; y < height; y++) {
@@ -985,15 +1076,14 @@ var gleech = (function(gleech) {
     imageData.data.set(data);
     return imageData;
   };
-  gleech.DrumrollHorizontalWave = function DrumrollHorizontalWave(imageData) {
-    /* borrowed from https://github.com/ninoseki/glitched-canvas & modified
-     * with cosine */
+  gleech.DrumrollHorizontalWave = function DrumrollHorizontalWave(imageData, options) {
     var data = imageData.data,
       width = imageData.width,
       height = imageData.height,
+      freq = getOpt(options, 'frequency', function() { return 1; }),
       roll = 0;
     for (var x = 0; x < width; x++) {
-      if (Math.random() > 0.95) roll = Math.floor(Math.cos(x) * (height * 2));
+      if (Math.random() > 0.95) roll = Math.floor(Math.cos(x * freq) * (height * 2));
       if (Math.random() > 0.98) roll = 0;
 
       for (var y = 0; y < height; y++) {
@@ -1012,11 +1102,11 @@ var gleech = (function(gleech) {
     imageData.data.set(data);
     return imageData;
   };
-  gleech.DrumrollVertical = function DrumrollVertical(imageData) {
-    /* borrowed from https://github.com/ninoseki/glitched-canvas */
+  gleech.DrumrollVertical = function DrumrollVertical(imageData, options) {
     var data = imageData.data,
       width = imageData.width,
       height = imageData.height,
+      rolls = Math.max(1, Math.round(getOpt(options, 'rolls', null, 1))),
       roll = 0;
     for (var x = 0; x < width; x++) {
       if (Math.random() > 0.95) roll = randFloor(height);
@@ -1038,11 +1128,11 @@ var gleech = (function(gleech) {
     imageData.data.set(data);
     return imageData;
   };
-  gleech.DrumrollHorizontal = function DrumrollHorizontal(imageData) {
-    /* borrowed from https://github.com/ninoseki/glitched-canvas */
+  gleech.DrumrollHorizontal = function DrumrollHorizontal(imageData, options) {
     var data = imageData.data,
       width = imageData.width,
       height = imageData.height,
+      rolls = Math.max(1, Math.round(getOpt(options, 'rolls', null, 1))),
       roll = 0;
     for (var x = 0; x < width; x++) {
       if (Math.random() < 0.05) roll = randFloor(height);
@@ -1065,13 +1155,11 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.scanlines = function scanlines(imageData) {
-    // future options:
-    // type, xor/or ammount, stripe width
+  gleech.scanlines = function scanlines(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
       width = imageData.width, height = imageData.height,
       type = randRange(0, 3),
-      size = randRange(3, 15),
+      size = Math.max(1, Math.round(getOpt(options, 'density', function() { return randRange(3, 15); }))),
       xorNum = randChoice([0x00555555, 0x00FF00FF00, 0x00F0F0F0, 0x00333333]),
       orNum = randChoice([0xFF555555, 0xFFFF00FF00, 0xFFF0F0F0, 0xFF333333]);
     for (var i = 0, l = data.length; i < l; i += (width * size)) {
@@ -1092,10 +1180,13 @@ var gleech = (function(gleech) {
     return imageData;
   };
 
-  gleech.pixelSort = function pixelSort(imageData) {
+  gleech.pixelSort = function pixelSort(imageData, options) {
     var data = new Uint32Array(imageData.data.buffer),
-      width = imageData.width, height = imageData.height;
-    var upper = 0xFFAAAAAA, lower = 0xFF333333;
+      width = imageData.width, height = imageData.height,
+      thresh = getOpt(options, 'threshold', null, 128);
+    var hexVal = Math.min(255, Math.max(0, thresh)).toString(16).padStart(2, '0');
+    var upper = parseInt('FF' + hexVal + hexVal + hexVal, 16);
+    var lower = 0xFF222222;
     for (var i = 0, size = data.length; i < size; i += width) {
       var row = Array.apply([], data.subarray(i, i + width));
       var low = 0, high = 0;
@@ -1223,11 +1314,12 @@ var gleech = (function(gleech) {
    ***************************************************/
 
   // 1. jpegBlockRot: 8x8 MCU phase desync & DC drift
-  gleech.jpegBlockRot = function jpegBlockRot(imageData) {
+  gleech.jpegBlockRot = function jpegBlockRot(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
-      blockSize = 8;
+      blockSize = Math.max(4, Math.round(getOpt(options, 'blockSize', null, 8))),
+      chromaShift = getOpt(options, 'chromaShift', null, true);
     for (var by = 0; by < height; by += blockSize) {
       for (var bx = 0; bx < width; bx += blockSize) {
         if (Math.random() < 0.65) {
@@ -1274,12 +1366,13 @@ var gleech = (function(gleech) {
   };
 
   // 2. mosquitoRings: Gibbs cosine halo injection around contrast edges
-  gleech.mosquitoRings = function mosquitoRings(imageData) {
+  gleech.mosquitoRings = function mosquitoRings(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
       copy = new Uint8ClampedArray(data),
-      ringRadius = 5;
+      ringRadius = Math.max(1, Math.round(getOpt(options, 'radius', null, 5))),
+      intensityVal = getOpt(options, 'intensity', null, 45);
     for (var y = 2; y < height - 2; y += 2) {
       for (var x = 2; x < width - 2; x += 2) {
         var idx = (y * width + x) * 4;
@@ -1290,7 +1383,7 @@ var gleech = (function(gleech) {
 
         if (grad > 40) {
           for (var r = 1; r <= ringRadius; r++) {
-            var wave = Math.cos(r * 1.7) * Math.exp(-r * 0.35) * 45;
+            var wave = Math.cos(r * 1.7) * Math.exp(-r * 0.35) * intensityVal;
             if (x + r < width) {
               var tidx = (y * width + (x + r)) * 4;
               data[tidx] = Math.min(255, Math.max(0, data[tidx] + wave));
@@ -1311,7 +1404,7 @@ var gleech = (function(gleech) {
   };
 
   // 3. chromaBleed420: Asymmetric YCbCr phase smear & 4:2:0 decimation
-  gleech.chromaBleed420 = function chromaBleed420(imageData) {
+  gleech.chromaBleed420 = function chromaBleed420(imageData, options) {
     var width = imageData.width,
       height = imageData.height,
       data = imageData.data,
@@ -1327,7 +1420,7 @@ var gleech = (function(gleech) {
       Cr[i] = 0.5 * r - 0.418688 * g - 0.081312 * b + 128;
     }
 
-    var smearOffset = randRange(8, 26);
+    var smearOffset = Math.round(getOpt(options, 'bleed', function() { return randRange(8, 26); }));
     var mbSize = 16;
 
     for (var my = 0; my < height; my += mbSize) {

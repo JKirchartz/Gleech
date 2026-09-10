@@ -85,10 +85,26 @@ function printInfo(op) {
     }
   }
 
-  console.log(`\nAlgorithm: ${op}`);
-  console.log(`Category:  ${catName}`);
-  console.log(`CLI:       gleech ${op} input.jpg output.png`);
-  console.log(`Callable:  gleech.${op}(imageData) or img.${op}()`);
+  const meta = gleech.commands && gleech.commands[op];
+
+  console.log(`\nAlgorithm:   ${op}`);
+  console.log(`Category:    ${catName}`);
+  if (meta && meta.desc) {
+    console.log(`Description: ${meta.desc}`);
+  }
+  console.log(`CLI:         gleech ${op} input.jpg output.png`);
+  console.log(`API:         gleech.${op}(imageData, options) or img.${op}(options)`);
+
+  if (meta && meta.params && meta.params.length > 0) {
+    console.log('\nEditable Parameters:');
+    for (const p of meta.params) {
+      const pName = p.id || p.name;
+      const def = p.default !== undefined ? ` (default: ${p.default})` : '';
+      const range = (p.min !== undefined && p.max !== undefined) ? ` [${p.min}-${p.max}]` : '';
+      const choices = p.options ? ` [${p.options.join(', ')}]` : '';
+      console.log(`  --${pName}=<val>: ${p.label}${def}${range}${choices}`);
+    }
+  }
   console.log('');
 }
 
@@ -101,10 +117,37 @@ async function executeGlitch(input, output, op, rawParams = []) {
       process.exit(1);
     }
 
-    const parsedParams = rawParams.map(p => {
-      const num = parseFloat(p);
-      return isNaN(num) ? p : num;
-    });
+    const meta = gleech.commands && gleech.commands[algorithm];
+    const options = {};
+    const positional = [];
+
+    for (const p of rawParams) {
+      if (typeof p === 'string' && p.startsWith('--')) {
+        const eqIdx = p.indexOf('=');
+        if (eqIdx !== -1) {
+          const key = p.slice(2, eqIdx);
+          const rawVal = p.slice(eqIdx + 1);
+          const num = parseFloat(rawVal);
+          options[key] = isNaN(num) ? rawVal : num;
+        } else {
+          options[p.slice(2)] = true;
+        }
+      } else {
+        const num = parseFloat(p);
+        positional.push(isNaN(num) ? p : num);
+      }
+    }
+
+    // Map positional arguments to parameter names if defined in schema
+    if (meta && meta.params && positional.length > 0) {
+      for (let i = 0; i < positional.length && i < meta.params.length; i++) {
+        const paramDef = meta.params[i];
+        const paramKey = paramDef.id || paramDef.name;
+        if (options[paramKey] === undefined) {
+          options[paramKey] = positional[i];
+        }
+      }
+    }
 
     console.log(`[gleech] Loading: ${input}`);
     const startTime = performance.now();
@@ -114,11 +157,7 @@ async function executeGlitch(input, output, op, rawParams = []) {
 
     console.log(`[gleech] Applying "${algorithm}" on ${width}x${height}px image...`);
 
-    if (parsedParams.length > 0) {
-      image[algorithm](...parsedParams);
-    } else {
-      image[algorithm]();
-    }
+    image[algorithm](options);
 
     await image.writeAsync(output);
     const duration = Math.round((performance.now() - startTime) * 10) / 10;

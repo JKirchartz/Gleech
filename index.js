@@ -6,6 +6,7 @@
  */
 
 import { gleech } from './src/core/glitch-engine.js';
+import { algorithmParams } from './src/core/algorithm-params.js';
 
 // Lazy-load Jimp only when in Node.js
 let jimpModule = null;
@@ -33,6 +34,13 @@ function decorateJimpImage(image) {
       return image;
     };
   }
+  image.preset = function(num, ...args) {
+    const fnName = 'preset' + num;
+    if (typeof image[fnName] === 'function') {
+      return image[fnName](...args);
+    }
+    return image;
+  };
   if (!image.writeAsync) {
     image.writeAsync = function(path) {
       return new Promise((resolve, reject) => {
@@ -97,5 +105,5 @@ gleech.glitchFile = async function glitchFile(inputPath, outputPath, algorithm =
   return image;
 };
 
-export { gleech };
+export { gleech, algorithmParams };
 export default gleech;
