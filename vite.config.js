@@ -9,7 +9,15 @@ export default defineConfig({
       compilerOptions: {
         customElement: true,
       }
-    })
+    }),
+    {
+      name: 'main-resolver',
+      resolveId(id) {
+        if (id === './main.js' || id === '/main.js' || id === 'main.js' || id.endsWith('/main.js')) {
+          return resolve(import.meta.dirname, 'src/main.js');
+        }
+      }
+    }
   ],
   server: {
     host: '0.0.0.0',
@@ -17,15 +25,25 @@ export default defineConfig({
     strictPort: true
   },
   build: {
-    outDir: 'docs',
+    outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: resolve(import.meta.dirname, 'index.html'),
+        index: resolve(import.meta.dirname, 'index.html'),
         glitch: resolve(import.meta.dirname, 'glitch.html'),
         cruiser: resolve(import.meta.dirname, 'GlitchCruiser.html'),
         chooser: resolve(import.meta.dirname, 'GlitchChooser.html'),
         docs: resolve(import.meta.dirname, 'gleech.js.html')
+      },
+      output: {
+        entryFileNames: '[name].js',
+        chunkFileNames: (chunkInfo) => {
+          if (chunkInfo.name === 'main' || chunkInfo.name === 'src/main') {
+            return 'main.js';
+          }
+          return 'assets/[name]-[hash].js';
+        },
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     }
   },

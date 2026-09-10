@@ -31,19 +31,13 @@
   "dependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "commander": "^2.11.0",
-    "express": "^5.2.1",
     "jimp": "^0.2.27",
     "svelte": "^5.57.0",
     "vite": "^8.2.2"
   },
-  "devDependencies": {
-    "grunt": "^1.0.1",
-    "grunt-contrib-concat": "^1.0.1",
-    "grunt-contrib-jshint": "^1.1.0"
-  },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node -e \"const fs=require('fs'); fs.writeFileSync('docs/.nojekyll', ''); fs.cpSync('docs', 'dist', {recursive:true});\"",
+    "build": "vite build && node -e \"const fs=require('fs'); fs.writeFileSync('.nojekyll', ''); fs.copyFileSync('dist/main.js', 'main.js'); fs.cpSync('dist/assets', 'assets', {recursive:true});\"",
     "preview": "vite preview",
     "lint": "node --check index.js bin/gleech src/main.js src/core/glitch-engine.js src/core/canvas-utils.js src/workers/glitch.worker.js src/workers/worker-pool.js",
     "test": "node --check index.js && ./bin/gleech list && node -e \"import('./index.js').then(m => console.log('gleech OK with', m.gleech.all.length, 'algorithms'))\""
