@@ -17,7 +17,7 @@ In general, we follow the "fork-and-pull" Git workflow.
 
 ## Copyleft and Licensing
 
-This project is presented under [GPL 3.0](gpl-3.0.txt) for more information on what this means, see the [GPL FAQ](https://www.gnu.org/licenses/gpl-faq.html)
+This project is presented under [GPL 3.0](LICENSE) for more information on what this means, see the [GPL FAQ](https://www.gnu.org/licenses/gpl-faq.html)
 I will accept any code presented under MIT or Apache licenses, as they are compatible to include in GNU Public Licensed projects.
 I do not require you to assign the copyright of your contributions, but credit will always be given where credit is due.
 If you are adding a new file that you wrote, include your name in the copyright notice in the license summary at the top of the file.

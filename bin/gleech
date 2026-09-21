@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 'use strict';
-/*
- * Gleech CLI
- * Copyright (C) 2017-2026 jkirchartz <me@jkirchartz.com>
- *
- * Distributed under terms of the GPL3.0 license.
+/**
+ * @file bin/gleech
+ * @author J. Kirchartz <me@jkirchartz.com>
+ * @license GPL-3.0
+ * @description Zero-dependency CLI for Gleech image manipulation.
+ * Supports syntax forms:
+ *   gleech <algorithm> <input> <output> [parameters...]
+ *   gleech <input> <output> [algorithm] [parameters...]
+ *   gleech list
+ *   gleech info <algorithm>
  */
+
 import { readFileSync } from 'fs';
 import { gleech } from '../index.js';
 
@@ -13,13 +19,18 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),
 
 const algorithmCategories = gleech.categories || {
   presets: ['theWorks', 'randomGlitch', 'glitch', 'preset1', 'preset2', 'preset3', 'preset4'],
+  jpegCorrupt: ['jpegBlockRot', 'mosquitoRings', 'chromaBleed420', 'huffmanSlip', 'nyquistPoison', 'restartMarkerDrop', 'quantizeCrush', 'subsamplingShear'],
+  digitalTV: ['ghostBlocks', 'tsPacketLoss', 'macroblockFreeze', 'digitalArtifacts'],
+  analogCRT: ['DrumrollHorizontal', 'DrumrollVertical', 'DrumrollHorizontalWave', 'DrumrollVerticalWave', 'vcrTracking', 'verticalHold', 'antennaGhost', 'interlaceJitter'],
   dithering: ['ditherFloydSteinberg', 'ditherAtkinsons', 'ditherBayer', 'ditherBayer3', 'dither8Bit', 'ditherHalftone', 'ditherBitmask', 'ditherRandom', 'ditherRandom3'],
   pixelSorting: ['pixelFunk', 'superPixelFunk', 'sort', 'shortsort', 'shortdumbsort', 'slicesort', 'sortStripe', 'sortRows', 'randomSortRows', 'dumbSortRows', 'pixelSort'],
   geometry: ['slice', 'slice2', 'slice3', 'superSlice', 'superSlice2', 'scanlines', 'focusImage', 'fractal', 'fractal2', 'fractalGhosts', 'fractalGhosts2', 'fractalGhosts3', 'fractalGhosts4'],
-  analogCRT: ['DrumrollHorizontal', 'DrumrollVertical', 'DrumrollHorizontalWave', 'DrumrollVerticalWave'],
   colorShifts: ['rgb_glitch', 'superShift', 'colorShift', 'colorShift2', 'redShift', 'greenShift', 'blueShift', 'invert']
 };
 
+/**
+ * Prints the CLI usage help banner.
+ */
 function printHelp() {
   console.log(`
 Gleech CLI v${pkg.version}
@@ -45,6 +56,9 @@ Commands:
 `);
 }
 
+/**
+ * Prints all available algorithms grouped by category.
+ */
 function printList() {
   console.log(`\n=== Gleech Algorithms (${gleech.all.length} total) ===\n`);
 
@@ -71,6 +85,11 @@ function printList() {
   console.log('  gleech vcrTracking input.jpg output.png\n');
 }
 
+/**
+ * Prints details and configurable parameters for an algorithm.
+ *
+ * @param {string} op - Algorithm name to query
+ */
 function printInfo(op) {
   if (!gleech.all.includes(op)) {
     console.error(`[gleech] Error: Algorithm "${op}" is not recognized. Run "gleech list" for available options.`);
@@ -108,6 +127,14 @@ function printInfo(op) {
   console.log('');
 }
 
+/**
+ * Reads an image, processes it with the specified algorithm, and writes output.
+ *
+ * @param {string} input - Path to source image
+ * @param {string} output - Path to write output image
+ * @param {string} op - Algorithm name
+ * @param {string[]} [rawParams=[]] - Raw command-line parameter tokens
+ */
 async function executeGlitch(input, output, op, rawParams = []) {
   try {
     const algorithm = op || 'theWorks';
@@ -121,6 +148,7 @@ async function executeGlitch(input, output, op, rawParams = []) {
     const options = {};
     const positional = [];
 
+    // Parse flags like --key=val, --flag, or positional numbers
     for (const p of rawParams) {
       if (typeof p === 'string' && p.startsWith('--')) {
         const eqIdx = p.indexOf('=');
@@ -138,7 +166,7 @@ async function executeGlitch(input, output, op, rawParams = []) {
       }
     }
 
-    // Map positional arguments to parameter names if defined in schema
+    // Map positional arguments to parameter schema IDs
     if (meta && meta.params && positional.length > 0) {
       for (let i = 0; i < positional.length && i < meta.params.length; i++) {
         const paramDef = meta.params[i];
@@ -157,8 +185,20 @@ async function executeGlitch(input, output, op, rawParams = []) {
 
     console.log(`[gleech] Applying "${algorithm}" on ${width}x${height}px image...`);
 
+    // Execute glitch algorithm
     image[algorithm](options);
 
+    const sub = (algorithm === 'theWorks' && gleech.theWorks && gleech.theWorks.lastSelected)
+      ? gleech.theWorks.lastSelected
+      : (algorithm === 'randomGlitch' && gleech.randomGlitch && gleech.randomGlitch.lastSelected)
+        ? gleech.randomGlitch.lastSelected
+        : null;
+
+    if (sub && sub.length > 0) {
+      console.log(`[gleech] ${algorithm} applied ${sub.length} glitches: ${sub.join(', ')}`);
+    }
+
+    // Save result to disk
     await image.writeAsync(output);
     const duration = Math.round((performance.now() - startTime) * 10) / 10;
     console.log(`[gleech] Glitched image saved to ${output} (${duration}ms)`);
@@ -168,6 +208,9 @@ async function executeGlitch(input, output, op, rawParams = []) {
   }
 }
 
+/**
+ * Command-line entry point dispatcher.
+ */
 async function main() {
   const args = process.argv.slice(2);
 
@@ -210,8 +253,6 @@ async function main() {
   }
 
   // Preferred direct syntax: gleech <algorithm> <input> <output> [parameters...]
-  // e.g. gleech theWorks input.jpg output.png
-  // e.g. gleech pixelFunk input.jpg output.png 8
   if (gleech.all.includes(args[0]) || typeof gleech[args[0]] === 'function') {
     const op = args[0];
     const input = args[1];
@@ -226,8 +267,6 @@ async function main() {
   }
 
   // Alternative syntax: gleech <input> <output> [algorithm] [parameters...]
-  // e.g. gleech photo.jpg out.png
-  // e.g. gleech photo.jpg out.png ditherFloydSteinberg
   if (args.length >= 2) {
     const input = args[0];
     const output = args[1];
@@ -253,4 +292,3 @@ async function main() {
 }
 
 main();
-

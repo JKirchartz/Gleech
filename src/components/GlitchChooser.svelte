@@ -3,7 +3,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import * as dat from 'dat.gui';
-  import { gleech } from '../core/glitch-engine.js';
+  import { gleech } from '../core/gleech-engine.js';
   import { algorithmParams } from '../core/algorithm-params.js';
   import { workerPool } from '../workers/worker-pool.js';
   import { loadImageFromFile, createDefaultTestImage, resultToDataUrl } from '../core/canvas-utils.js';
@@ -144,6 +144,7 @@
         dataUrl,
         imageData: res.imageData,
         label: selectedFunction,
+        subAlgorithms: res.subAlgorithms || null,
         duration: res.duration,
         isLivePreview: true
       };
@@ -231,6 +232,7 @@
           dataUrl,
           imageData: res.imageData,
           label: selectedFunction,
+          subAlgorithms: res.subAlgorithms || null,
           duration: res.duration
         };
       }
@@ -262,6 +264,7 @@
         dataUrl,
         imageData: res.imageData,
         label: selectedFunction,
+        subAlgorithms: res.subAlgorithms || null,
         duration: res.duration,
         isLivePreview: false
       };
@@ -423,6 +426,16 @@
         </div>
       {/if}
 
+      {#if displayedItem.subAlgorithms && displayedItem.subAlgorithms.length > 0}
+        <div class="sub-algorithms-indicator">
+          <span class="sub-algo-label">Chosen Glitches ({displayedItem.subAlgorithms.length}):</span>
+          {#each displayedItem.subAlgorithms as sub, idx}
+            {#if idx > 0}<span class="sub-algo-arrow">→</span>{/if}
+            <span class="sub-algo-badge" title="Applied glitch algorithm">{sub}</span>
+          {/each}
+        </div>
+      {/if}
+
       <div class="canvas-container">
         <img src={displayedItem.dataUrl} alt={displayedItem.label} />
       </div>
@@ -483,6 +496,40 @@
     background: #553;
     color: #ffd;
     border: 1px dashed #aa0;
+  }
+  .sub-algorithms-indicator {
+    margin: 0.4em auto 0.6em auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35em;
+    font-size: 0.85em;
+    background: #222;
+    padding: 0.4em 0.8em;
+    border-radius: 4px;
+    border: 1px solid #3a3a3a;
+    max-width: 90%;
+  }
+  .sub-algo-label {
+    color: #888;
+    font-size: 0.85em;
+    margin-right: 0.2em;
+  }
+  .sub-algo-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: #1e3a47;
+    color: #7de;
+    border: 1px solid #007799;
+    font-family: monospace;
+    font-size: 0.9em;
+    white-space: nowrap;
+  }
+  .sub-algo-arrow {
+    color: #666;
+    font-size: 0.8em;
   }
   .download-action {
     margin: 0.6em auto 1.2em auto;

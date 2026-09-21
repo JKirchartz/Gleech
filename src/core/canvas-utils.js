@@ -1,12 +1,28 @@
 /**
- * Utility functions for loading images and rendering with Canvas / OffscreenCanvas
+ * @file canvas-utils.js
+ * @module canvas-utils
+ * @author J. Kirchartz <me@jkirchartz.com>
+ * @license GPL-3.0
+ * @description Image loading and canvas conversion utilities.
+ * Handles conversions between File, URL, HTMLImageElement, HTMLCanvasElement,
+ * OffscreenCanvas, ImageData, and ImageBitmap.
  */
 
+/**
+ * Loads a local image file into an ImageData buffer and canvas context.
+ * Uses willReadFrequently to keep backing store in CPU RAM for fast getImageData access.
+ *
+ * @param {File|Blob} file - Image file from file input or drop event
+ * @returns {Promise<{img: HTMLImageElement, width: number, height: number, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, imageData: ImageData, dataUrl: string}>} Loaded image context
+ */
 export async function loadImageFromFile(file) {
   return new Promise((resolve, reject) => {
+    // Validate MIME type
     if (!file || !file.type.match(/^image\//)) {
       return reject(new Error('Please select a valid image file.'));
     }
+
+    // Read file as base64 Data URL
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -15,9 +31,12 @@ export async function loadImageFromFile(file) {
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
+
+        // willReadFrequently avoids GPU-to-CPU stalls when calling getImageData
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         ctx.drawImage(img, 0, 0, width, height);
         const imageData = ctx.getImageData(0, 0, width, height);
+
         resolve({ img, width, height, canvas, ctx, imageData, dataUrl: e.target.result });
       };
       img.onerror = reject;
@@ -28,18 +47,28 @@ export async function loadImageFromFile(file) {
   });
 }
 
+/**
+ * Loads a remote image by URL with anonymous CORS headers.
+ *
+ * @param {string} url - Public image URL
+ * @returns {Promise<{img: HTMLImageElement, width: number, height: number, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, imageData: ImageData, dataUrl: string}>} Loaded image context
+ */
 export async function loadImageFromUrl(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    // Enable cross-origin resource sharing to prevent canvas tainting
     img.crossOrigin = 'Anonymous';
     img.onload = () => {
       const { width, height } = img;
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
+
+      // Extract raw pixels to unattached canvas
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(img, 0, 0, width, height);
       const imageData = ctx.getImageData(0, 0, width, height);
+
       resolve({ img, width, height, canvas, ctx, imageData, dataUrl: canvas.toDataURL('image/png') });
     };
     img.onerror = reject;
@@ -48,7 +77,12 @@ export async function loadImageFromUrl(url) {
 }
 
 /**
- * Creates a built-in retro test canvas image for instant testing
+ * Generates a synthetic geometric calibration image with gradients, shapes, and fine lines.
+ * Useful for testing dithering thresholds, Nyquist limits, and color quantization.
+ *
+ * @param {number} [width=240] - Pattern canvas width in pixels
+ * @param {number} [height=240] - Pattern canvas height in pixels
+ * @returns {{width: number, height: number, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, imageData: ImageData, dataUrl: string}} Generated pattern data
  */
 export function createDefaultTestImage(width = 240, height = 240) {
   const canvas = document.createElement('canvas');
@@ -56,7 +90,7 @@ export function createDefaultTestImage(width = 240, height = 240) {
   canvas.height = height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-  // Vibrant gradient background
+  // Diagonal linear gradient (tests color band quantization)
   const grad = ctx.createLinearGradient(0, 0, width, height);
   grad.addColorStop(0, '#e63946');
   grad.addColorStop(0.3, '#f1faee');
@@ -65,7 +99,7 @@ export function createDefaultTestImage(width = 240, height = 240) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
-  // Geometric shapes
+  // Geometric shapes with sharp vector edges
   ctx.fillStyle = '#ffb703';
   ctx.beginPath();
   ctx.arc(width * 0.35, height * 0.4, width * 0.25, 0, Math.PI * 2);
@@ -82,7 +116,7 @@ export function createDefaultTestImage(width = 240, height = 240) {
   ctx.closePath();
   ctx.fill();
 
-  // Fine detail lines for dithering demonstration
+  // High-frequency diagonal grid lines (tests Nyquist aliasing and Gibbs ringing)
   ctx.strokeStyle = '#219ebc';
   ctx.lineWidth = 3;
   for (let i = 0; i < width; i += 16) {
@@ -104,13 +138,21 @@ export function createDefaultTestImage(width = 240, height = 240) {
 }
 
 /**
- * Converts a worker result (bitmap or imageData) into an HTML Image data URL or renders to canvas
+ * Converts a worker execution result (ImageBitmap or ImageData) to a PNG Data URL.
+ * Prefers OffscreenCanvas when supported for headless performance.
+ *
+ * @param {Object} result - Result payload from worker run
+ * @param {number} result.width - Image width
+ * @param {number} result.height - Image height
+ * @param {ImageBitmap} [result.bitmap] - GPU texture bitmap
+ * @param {ImageData} [result.imageData] - Raw pixel buffer
+ * @returns {string} Data URL string (image/png)
  */
 export function resultToDataUrl(result) {
   if (!result) return '';
   const { width, height, bitmap, imageData } = result;
 
-  // Use OffscreenCanvas if available
+  // Fast path: use OffscreenCanvas if available
   if (typeof OffscreenCanvas !== 'undefined') {
     try {
       const offscreen = new OffscreenCanvas(width, height);
@@ -120,7 +162,6 @@ export function resultToDataUrl(result) {
       } else if (imageData) {
         ctx.putImageData(imageData, 0, 0);
       }
-      // Return canvas data URL via temp canvas or blob
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
@@ -128,10 +169,11 @@ export function resultToDataUrl(result) {
       cctx.drawImage(offscreen, 0, 0);
       return canvas.toDataURL('image/png');
     } catch (e) {
-      // Fall through to standard canvas
+      // Fall through to DOM canvas
     }
   }
 
+  // Fallback: draw directly to DOM canvas
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -145,7 +187,10 @@ export function resultToDataUrl(result) {
 }
 
 /**
- * Extract ImageData from an image or data URL
+ * Decodes a PNG or JPEG Data URL into an uncompressed ImageData buffer.
+ *
+ * @param {string} dataUrl - Base64 image data URL
+ * @returns {Promise<ImageData>} Decoded raw ImageData
  */
 export async function dataUrlToImageData(dataUrl) {
   return new Promise((resolve, reject) => {

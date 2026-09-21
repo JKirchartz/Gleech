@@ -141,3 +141,15 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Jekyll & static site outputs
+_site/
+.jekyll-metadata
+.jekyll-cache/
+
+# Local test outputs (preserve tracked test fixtures)
+test-output.*
+*-out.*
+*.out.png
+*.out.jpg
+

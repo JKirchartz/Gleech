@@ -1,8 +1,10 @@
-/*
- * algorithm-params.js
- * Parameter schemas and specifications for Gleech glitch and dithering algorithms.
- * Copyright (C) 2017-2026 jkirchartz <me@jkirchartz.com>
- * Distributed under terms of the GPL 3.0 license.
+/**
+ * @file algorithm-params.js
+ * @module algorithm-params
+ * @author J. Kirchartz <me@jkirchartz.com>
+ * @license GPL-3.0
+ * @description Parameter schemas and specifications for Gleech glitch and dithering algorithms.
+ * Used by UI controls to render interactive sliders and by the CLI to parse command-line flags.
  */
 
 export const algorithmParams = {
@@ -11,19 +13,18 @@ export const algorithmParams = {
     name: 'theWorks',
     label: 'The Works',
     category: 'presets',
-    description: 'Chains multiple glitch algorithms in sequence for a complete aesthetic degradation',
+    description: 'Stochastically chains 2–5 distinct non-preset glitch algorithms to mutilate the original image without overriding it',
     params: [
-      { id: 'iterations', label: 'Iterations', type: 'range', min: 1, max: 8, step: 1, default: 'auto', defaultHint: 'Random (2–5 passes)' },
-      { id: 'intensity', label: 'Intensity', type: 'range', min: 1, max: 5, step: 1, default: 1, defaultHint: 'Multiplier 1–5' }
+      { id: 'iterations', label: 'Glitch Count', type: 'range', min: 2, max: 5, step: 1, default: 'auto', defaultHint: 'Random (2–5 distinct glitches)' }
     ]
   },
   randomGlitch: {
     name: 'randomGlitch',
     label: 'Random Glitch',
     category: 'presets',
-    description: 'Applies a randomly sampled chain of different glitch algorithms',
+    description: 'Randomly samples 2–4 distinct non-preset glitch algorithms',
     params: [
-      { id: 'amount', label: 'Glitch Count', type: 'range', min: 1, max: 10, step: 1, default: 'auto', defaultHint: 'Random (3–6 algorithms)' }
+      { id: 'amount', label: 'Glitch Count', type: 'range', min: 2, max: 4, step: 1, default: 'auto', defaultHint: 'Random (2–4 distinct glitches)' }
     ]
   },
   glitch: {

@@ -4,7 +4,7 @@ import './components/GlitchChooser.svelte';
 import './components/GlitchOnly.svelte';
 import './components/GlitchDialog.svelte';
 import './components/GlitchDocs.svelte';
-import { gleech } from './core/glitch-engine.js';
+import { gleech } from './core/gleech-engine.js';
 import { workerPool } from './workers/worker-pool.js';
 
 // Attach gleech to window for developer console and backward compatibility

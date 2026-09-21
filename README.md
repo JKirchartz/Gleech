@@ -10,7 +10,7 @@ the below information is probably already outdated:
 
 ## Features
 
-- **52 Algorithmic Mutators**: A unified suite of 52 glitch, dithering, pixel sorting, CRT, and chromatic mutation algorithms.
+- **68 Algorithmic Mutators**: A unified suite of 68 glitch, dithering, pixel sorting, JPEG corruption, CRT/VCR tracking, and chromatic mutation algorithms.
 - **Node.js CLI Application**: First-class command-line interface executable via `npx` or installed globally.
 - **Programmatic Node.js Library**: Supports async/await, method chaining pipelines, and file-to-file processing.
 - **Zero-Dependency Browser Engine**: The core glitch engine runs directly on standard `ImageData` and typed pixel arrays.
@@ -58,7 +58,7 @@ You can also pass `<input> <output> [algorithm]` or use the legacy `gleech glitc
 |---|---|
 | `gleech <algo> <in> <out> [params...]` | Glitches an input image using the chosen algorithm and writes to output. |
 | `gleech <in> <out> [algo]` | Convenience syntax defaulting to `theWorks` if algorithm is omitted. |
-| `gleech list` | Prints a categorized directory of all 52 algorithms. |
+| `gleech list` | Prints a categorized directory of all 68 algorithms. |
 | `gleech info <algo>` | Displays details and calling syntax for a specific algorithm. |
 | `-v, --version` | Outputs current version number. |
 
@@ -164,6 +164,30 @@ self.onmessage = (e) => {
 - `glitch`: Runs 10 consecutive random passes mixing color shifts, dithering, and inversions.
 - `preset1` - `preset4`: Curated composite recipe presets.
 
+### JPEG & Anti-JPEG Corruption
+- `jpegBlockRot`: Simulates discrete cosine transform (DCT) 8x8 block boundary corruption with progressive degradation.
+- `mosquitoRings`: High-frequency edge ringing artifacts around sharp transitions.
+- `chromaBleed420`: Subsamples color planes to 4:2:0 format with lateral color smear.
+- `huffmanSlip`: Simulates bitstream corruption causing cascading horizontal pixel drift.
+- `nyquistPoison`: Injects high-frequency checkerboard noise exceeding sampling limits.
+- `restartMarkerDrop`: Simulates lost JPEG RST markers resetting MCU row alignments.
+- `quantizeCrush`: Heavy quantization matrix division crushing subtle gradients into stepped bands.
+- `subsamplingShear`: Diagonal shearing on subsampled color planes.
+- `ghostBlocks`: Echoes previous 8x8 block states into subsequent blocks.
+
+### Digital TV & Broadcast Corruption
+- `tsPacketLoss`: Emulates MPEG transport stream 188-byte packet drops causing rectangular tears.
+- `macroblockFreeze`: Simulates dropped P-frames freezing macroblock coordinates.
+- `digitalArtifacts`: Composite broadcast reception interference and signal degradation.
+
+### Analog TV, VCR & CRT Emulation
+- `DrumrollHorizontal` / `DrumrollVertical`: Horizontal and vertical sync slip emulation.
+- `DrumrollHorizontalWave` / `DrumrollVerticalWave`: Sinusoidal wave flutter and tracking wobble.
+- `vcrTracking`: Realistic VHS head tracking misalignment band with noise snow.
+- `verticalHold`: V-Hold rolling distortion drifting the raster frame.
+- `antennaGhost`: RF broadcast multipath reception ghost reflections.
+- `interlaceJitter`: Alternating field comb artifacts from high-motion interlaced video.
+
 ### Dithering (Ordered & Error-Diffusion)
 - `ditherFloydSteinberg`: Classic error-diffusion dithering distributing quantization error to 4 neighboring pixels.
 - `ditherAtkinsons`: Bill Atkinson (Apple Macintosh) error-diffusion dither with 1/8 error dispersal.
@@ -194,12 +218,6 @@ self.onmessage = (e) => {
 - `focusImage`: Sharp high-contrast edge amplification and center focus thresholding.
 - `fractal`, `fractal2`: Fractal feedback loop copying and blending scaled quad segments.
 - `fractalGhosts` (1 - 4): Displaced ghost echoes with variable opacity overlays and geometric recursion.
-
-### CRT & Analog Tape Emulation
-- `DrumrollHorizontal`: Horizontal CRT horizontal-hold slip emulation causing tearing bands.
-- `DrumrollVertical`: Vertical V-Hold rolling distortion shifting frame alignment downward.
-- `DrumrollHorizontalWave`: Sinusoidal horizontal wave displacement emulating tape flutter.
-- `DrumrollVerticalWave`: Vertical sinusoidal wave warping producing wobbling tape distortion.
 
 ### Color Plane Shifts & Inversion
 - `rgb_glitch`: Displaces red, green, and blue color planes along randomized coordinate vectors.

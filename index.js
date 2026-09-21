@@ -1,14 +1,21 @@
-/*
- * index.js
- * Copyright (C) 2017-2026 jkirchartz <me@jkirchartz.com>
- *
- * Distributed under terms of the GPL 3.0 license.
+/**
+ * @file index.js
+ * @module gleech-node
+ * @author J. Kirchartz <me@jkirchartz.com>
+ * @license GPL-3.0
+ * @description Isomorphic wrapper bridging Gleech's ImageData engine with Jimp for Node.js workflows.
+ * Enables fluent method chaining (e.g. `img.superColorShift().ditherAtkinsons().writeAsync('out.png')`).
  */
 
-import { gleech } from './src/core/glitch-engine.js';
+import { gleech } from './src/core/gleech-engine.js';
 import { algorithmParams } from './src/core/algorithm-params.js';
 
-// Lazy-load Jimp only when in Node.js
+/**
+ * Lazy loads Jimp when executing in a Node.js runtime.
+ * Avoids bundling Jimp's Node.js dependencies into client-side browser builds.
+ *
+ * @returns {Promise<Object|null>} Jimp module or null
+ */
 let jimpModule = null;
 async function getJimp() {
   if (typeof process !== 'undefined' && process.versions && process.versions.node) {
@@ -21,19 +28,29 @@ async function getJimp() {
   return null;
 }
 
+/**
+ * Decorates a Jimp image instance with Gleech algorithm methods.
+ * Bridges Jimp's internal `image.bitmap` to Gleech's `{ data, width, height }` interface.
+ *
+ * @param {Object} image - Jimp image instance
+ * @returns {Object} Decorated chainable Jimp image
+ */
 function decorateJimpImage(image) {
   const allAlgos = gleech.all;
   for (const algo of allAlgos) {
     image[algo] = function(...args) {
+      // Proxy Jimp's bitmap buffer to match ImageData structure
       const target = {
         data: image.bitmap.data,
         width: image.bitmap.width,
         height: image.bitmap.height
       };
       gleech[algo](target, ...args);
-      return image;
+      return image; // Chainable: img.algoA().algoB()
     };
   }
+
+  // Helper to run numbered presets: img.preset(1) -> calls preset1()
   image.preset = function(num, ...args) {
     const fnName = 'preset' + num;
     if (typeof image[fnName] === 'function') {
@@ -41,6 +58,8 @@ function decorateJimpImage(image) {
     }
     return image;
   };
+
+  // Promise-based file export helper
   if (!image.writeAsync) {
     image.writeAsync = function(path) {
       return new Promise((resolve, reject) => {
@@ -55,14 +74,11 @@ function decorateJimpImage(image) {
 }
 
 /**
- * Reads an image file and returns a chainable Gleech/Jimp image.
- * Supports both Promise and Node-style callback:
- *   const img = await gleech.read('photo.jpg');
- *   img.pixelFunk().write('out.jpg');
+ * Reads an image file from disk and decorates it with Gleech filters.
  *
- *   gleech.read('photo.jpg', (err, img) => {
- *     img.theWorks().write('out.jpg');
- *   });
+ * @param {string|Buffer} input - Filepath or buffer to load
+ * @param {Function} [callback] - Optional error-first callback `(err, image)`
+ * @returns {Promise<Object>} Promise resolving to decorated Jimp image
  */
 gleech.read = function read(input, callback) {
   const promise = (async () => {
@@ -83,7 +99,13 @@ gleech.read = function read(input, callback) {
 };
 
 /**
- * Glitch an image file from inputPath and write to outputPath.
+ * Loads an image from disk, applies a glitch filter, and writes it back to disk.
+ *
+ * @param {string} inputPath - Source image path
+ * @param {string} outputPath - Destination image path
+ * @param {string} [algorithm='theWorks'] - Glitch algorithm name
+ * @param {Object} [options={}] - Options passed to the algorithm
+ * @returns {Promise<Object>} Mutated Jimp image
  */
 gleech.glitchFile = async function glitchFile(inputPath, outputPath, algorithm = 'theWorks', options = {}) {
   const image = await gleech.read(inputPath);

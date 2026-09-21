@@ -1,7 +1,7 @@
 <svelte:options customElement={{ tag: 'glitch-only', shadow: 'none' }} />
 
 <script>
-  import { gleech } from '../core/glitch-engine.js';
+  import { gleech } from '../core/gleech-engine.js';
   import { workerPool } from '../workers/worker-pool.js';
   import { loadImageFromFile, createDefaultTestImage, resultToDataUrl } from '../core/canvas-utils.js';
 

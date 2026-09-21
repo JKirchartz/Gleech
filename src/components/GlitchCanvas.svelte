@@ -76,5 +76,5 @@
   {#if errorMsg}
     <div style="color:#f66;font-size:12px;">{errorMsg}</div>
   {/if}
-  <canvas bind:this={canvasEl} style="display:inline-block;max-width:100%;image-rendering:pixelated;"></canvas>
+  <canvas bind:this={canvasEl} aria-label={alt} style="display:inline-block;max-width:100%;image-rendering:pixelated;"></canvas>
 </div>

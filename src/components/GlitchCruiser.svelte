@@ -3,7 +3,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import * as dat from 'dat.gui';
-  import { gleech } from '../core/glitch-engine.js';
+  import { gleech } from '../core/gleech-engine.js';
   import { algorithmParams } from '../core/algorithm-params.js';
   import { workerPool } from '../workers/worker-pool.js';
   import { loadImageFromFile, createDefaultTestImage, resultToDataUrl, dataUrlToImageData } from '../core/canvas-utils.js';

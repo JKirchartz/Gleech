@@ -2,7 +2,7 @@
 
 <script>
   import { onMount } from 'svelte';
-  import { gleech } from '../core/glitch-engine.js';
+  import { gleech } from '../core/gleech-engine.js';
   import { algorithmParams } from '../core/algorithm-params.js';
   import { workerPool } from '../workers/worker-pool.js';
   import { createDefaultTestImage, resultToDataUrl } from '../core/canvas-utils.js';
