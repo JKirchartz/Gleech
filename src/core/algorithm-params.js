@@ -462,10 +462,24 @@ export const algorithmParams = {
     name: 'pixelSort',
     label: 'Threshold Pixel Sort (Kim Asendorf)',
     category: 'pixelSorting',
-    description: 'Classic interval-based sorting between brightness thresholds',
+    description: 'Interval-based sorting across horizontal, vertical, or diagonal axes bounded by brightness or edge contours',
     params: [
+      { id: 'direction', label: 'Sort Direction', type: 'select', options: ['horizontal', 'vertical', 'diagonal', 'diagonal-alt'], default: 'horizontal', defaultHint: 'Horizontal rows' },
+      { id: 'mode', label: 'Boundary Mode', type: 'select', options: ['threshold', 'edge'], default: 'threshold', defaultHint: 'Brightness threshold' },
       { id: 'threshold', label: 'Brightness Cutoff', type: 'range', min: 0, max: 255, step: 1, default: 128, defaultHint: '128 threshold' },
-      { id: 'direction', label: 'Sort Axis', type: 'select', options: ['horizontal', 'vertical'], default: 'horizontal', defaultHint: 'Horizontal rows' }
+      { id: 'edgeThreshold', label: 'Edge Sensitivity', type: 'range', min: 5, max: 150, step: 1, default: 25, defaultHint: '25 threshold' },
+      { id: 'reverse', label: 'Reverse Order', type: 'boolean', default: false, defaultHint: 'Ascending / Descending' }
+    ]
+  },
+  edgePixelSort: {
+    name: 'edgePixelSort',
+    label: 'Edge-Guided Pixel Sort',
+    category: 'pixelSorting',
+    description: 'Detects structural image edges and sorts pixel spans bounded by contours without rendering the edges',
+    params: [
+      { id: 'direction', label: 'Sort Direction', type: 'select', options: ['vertical', 'horizontal', 'diagonal', 'diagonal-alt'], default: 'vertical', defaultHint: 'Vertical melt' },
+      { id: 'edgeThreshold', label: 'Edge Sensitivity', type: 'range', min: 5, max: 150, step: 1, default: 25, defaultHint: '25 (lower = more edges)' },
+      { id: 'reverse', label: 'Reverse Order', type: 'boolean', default: false, defaultHint: 'Ascending / Descending' }
     ]
   },
 
@@ -663,6 +677,49 @@ export const algorithmParams = {
     description: 'Inverts RGB tonal values',
     params: [
       { id: 'channel', label: 'Target Channels', type: 'select', options: ['all', 'red', 'green', 'blue'], default: 'all', defaultHint: 'Full color invert' }
+    ]
+  },
+
+  // === Databending & Raw Byte Manipulation ===
+  databend: {
+    name: 'databend',
+    label: 'Universal Databend',
+    category: 'databending',
+    description: 'Bridges canvas to raw uncompressed byte buffer, applying header stride shear or audio-inspired DSP',
+    params: [
+      { id: 'technique', label: 'Technique', type: 'select', options: ['audioEcho', 'combFilter', 'bytebeat', 'headerShear'], default: 'audioEcho', defaultHint: 'Audacity delay echo' },
+      { id: 'delay', label: 'Delay (bytes)', type: 'range', min: 8, max: 1024, step: 8, default: 128, defaultHint: '128 bytes' },
+      { id: 'decay', label: 'Decay / Feedback', type: 'range', min: 0.1, max: 0.95, step: 0.05, default: 0.5, defaultHint: '50% decay' }
+    ]
+  },
+  headerShear: {
+    name: 'headerShear',
+    label: 'Header Stride Shear',
+    category: 'databending',
+    description: 'Corrupts declared DIB width in the file header, forcing decoder to wrap scanlines diagonally',
+    params: [
+      { id: 'strideDelta', label: 'Stride Delta', type: 'range', min: -8, max: 8, step: 1, default: 2, defaultHint: '+2 pixel stride offset' }
+    ]
+  },
+  bytebeatRaster: {
+    name: 'bytebeatRaster',
+    label: 'Bytebeat Audio Raster',
+    category: 'databending',
+    description: 'Treats pixel bytes as sound wave, running 8-bit algorithmic bytebeat equations across raster',
+    params: [
+      { id: 'formula', label: 'Formula Preset', type: 'select', options: [1, 2, 3, 4, 5], default: 1, defaultHint: 'Viznut equation 1' },
+      { id: 'mix', label: 'Dry/Wet Mix', type: 'range', min: 0.1, max: 1.0, step: 0.05, default: 0.5, defaultHint: '50% blend' }
+    ]
+  },
+  audioEchoBend: {
+    name: 'audioEchoBend',
+    label: 'Audacity Echo Bend',
+    category: 'databending',
+    description: 'Simulates opening image as raw PCM in Audacity and applying multi-pass delay/echo',
+    params: [
+      { id: 'delay', label: 'Echo Delay (bytes)', type: 'range', min: 16, max: 512, step: 16, default: 128, defaultHint: '128 byte echo' },
+      { id: 'decay', label: 'Feedback Decay', type: 'range', min: 0.1, max: 0.95, step: 0.05, default: 0.5, defaultHint: '50% feedback' },
+      { id: 'passes', label: 'Passes', type: 'range', min: 1, max: 4, step: 1, default: 2, defaultHint: '2 passes' }
     ]
   }
 };

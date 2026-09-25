@@ -3,7 +3,7 @@
 <script>
   import { onMount } from 'svelte';
   import { workerPool } from '../workers/worker-pool.js';
-  import { loadImageFromUrl, resultToDataUrl } from '../core/canvas-utils.js';
+  import { loadImageFromUrl, resultToDataUrl, ensureImageData } from '../core/canvas-utils.js';
 
   export let src = '';
   export let algorithm = 'theWorks';
@@ -37,7 +37,8 @@
         if (res.bitmap) {
           ctx.drawImage(res.bitmap, 0, 0);
         } else if (res.imageData) {
-          ctx.putImageData(res.imageData, 0, 0);
+          const validImageData = ensureImageData(res.imageData, width, height);
+          ctx.putImageData(validImageData, 0, 0);
         }
       }
 

@@ -6,7 +6,13 @@
   import { gleech } from '../core/gleech-engine.js';
   import { algorithmParams } from '../core/algorithm-params.js';
   import { workerPool } from '../workers/worker-pool.js';
-  import { loadImageFromFile, createDefaultTestImage, resultToDataUrl } from '../core/canvas-utils.js';
+  import {
+    loadImageFromFile,
+    createDefaultTestImage,
+    resultToDataUrl,
+    setPreImportDatabend,
+    getPreImportDatabend
+  } from '../core/canvas-utils.js';
 
   let selectedFunction = 'theWorks';
   let lastLoadedFunction = '';
@@ -16,6 +22,11 @@
   let history = []; // Stack of applied mutation states: { dataUrl, imageData, label, duration, isLivePreview }
   let displayedItem = null; // Currently active displayed state: { dataUrl, imageData, label, duration, isLivePreview }
   let currentOptions = {};
+  let preImportTechnique = getPreImportDatabend().technique || 'none';
+
+  function handlePreImportChange() {
+    setPreImportDatabend(preImportTechnique);
+  }
 
   let previewTimer = null;
   let latestRequestId = 0;
@@ -302,11 +313,28 @@
 
 <div id="form">
   <input type="file" id="uploader" accept="image/*" on:change={handleFileInput} />
+
+  <div class="pre-import-pill" title="Pre-import raw byte databending & header corruption before canvas decode">
+    <span class="pre-import-tag">PRE-IMPORT:</span>
+    <select id="pre_import_select" bind:value={preImportTechnique} on:change={handlePreImportChange}>
+      <option value="none">Clean (None)</option>
+      <option value="headerShear">Header Stride Shear</option>
+      <option value="audioEcho">Audacity PCM Echo</option>
+      <option value="combFilter">Resonant Comb Filter</option>
+      <option value="bytebeat">Bytebeat Audio Raster</option>
+      <option value="jpegEntropy">JPEG Entropy Rot</option>
+    </select>
+  </div>
   
   <select id="functions" bind:value={selectedFunction}>
     {#if gleech.categories}
       <optgroup label="Presets">
         {#each gleech.categories.presets as fn}
+          <option value={fn}>{fn}</option>
+        {/each}
+      </optgroup>
+      <optgroup label="Databending & Byte Corruption">
+        {#each gleech.categories.databending as fn}
           <option value={fn}>{fn}</option>
         {/each}
       </optgroup>
@@ -496,6 +524,37 @@
     background: #553;
     color: #ffd;
     border: 1px dashed #aa0;
+  }
+  .pre-import-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    background: #25282c;
+    border: 1px solid #3e444b;
+    border-radius: 4px;
+    padding: 0.25em 0.55em;
+    margin: 0.2em 0.3em;
+    vertical-align: middle;
+  }
+  .pre-import-tag {
+    font-size: 0.72em;
+    font-weight: bold;
+    color: #4ecdc4;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .pre-import-pill select {
+    background: #191b1e;
+    color: #f0f0f0;
+    border: 1px solid #4a515a;
+    border-radius: 3px;
+    padding: 0.2em 0.4em;
+    font-size: 0.85em;
+    cursor: pointer;
+  }
+  .pre-import-pill select:focus {
+    outline: none;
+    border-color: #4ecdc4;
   }
   .sub-algorithms-indicator {
     margin: 0.4em auto 0.6em auto;

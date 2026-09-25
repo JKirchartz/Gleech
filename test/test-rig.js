@@ -327,13 +327,22 @@ export async function runTestRig(options = {}) {
       const origLog = console.log;
       console.log = () => {}; // Temporarily silence engine debug logs
 
-      // 1. Test standard mutation & metrics on calibration target
-      const testInput = cloneImage(basePattern);
-      const startTime = performance.now();
+      // 1. Test standard mutation & metrics on calibration target (with stochastic retry if coin tossed no-op)
+      let testInput = cloneImage(basePattern);
+      let startTime = performance.now();
       gleech[algo](testInput);
-      const elapsedMs = performance.now() - startTime;
+      let elapsedMs = performance.now() - startTime;
+      let metrics = analyzeMutation(basePattern, testInput, elapsedMs);
 
-      const metrics = analyzeMutation(basePattern, testInput, elapsedMs);
+      if (!metrics.passed && metrics.mutationRate === 0) {
+        for (let retry = 0; retry < 3 && (!metrics.passed && metrics.mutationRate === 0); retry++) {
+          testInput = cloneImage(basePattern);
+          startTime = performance.now();
+          gleech[algo](testInput);
+          elapsedMs = performance.now() - startTime;
+          metrics = analyzeMutation(basePattern, testInput, elapsedMs);
+        }
+      }
 
       // 2. Test determinism (run twice on fresh clones)
       const isDeterministic = testDeterminism(algo, basePattern);

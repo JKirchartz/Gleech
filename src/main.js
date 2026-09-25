@@ -31,7 +31,14 @@ if (typeof window !== 'undefined') {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const output = document.getElementById('output');
     if (typeof gleech[ditherer] === 'function') {
-      ctx.putImageData(gleech[ditherer](imageData), 0, 0);
+      const res = gleech[ditherer](imageData);
+      if (res) {
+        let out = res;
+        if (typeof ImageData !== 'undefined' && !(out instanceof ImageData)) {
+          out = new ImageData(out.data, out.width || canvas.width, out.height || canvas.height);
+        }
+        ctx.putImageData(out, 0, 0);
+      }
     }
     const img = document.createElement('img');
     img.src = canvas.toDataURL('image/png');

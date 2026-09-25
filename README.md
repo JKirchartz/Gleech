@@ -58,7 +58,7 @@ You can also pass `<input> <output> [algorithm]` or use the legacy `gleech glitc
 |---|---|
 | `gleech <algo> <in> <out> [params...]` | Glitches an input image using the chosen algorithm and writes to output. |
 | `gleech <in> <out> [algo]` | Convenience syntax defaulting to `theWorks` if algorithm is omitted. |
-| `gleech list` | Prints a categorized directory of all 68 algorithms. |
+| `gleech list` | Prints a categorized directory of all 69 algorithms. |
 | `gleech info <algo>` | Displays details and calling syntax for a specific algorithm. |
 | `-v, --version` | Outputs current version number. |
 
@@ -209,7 +209,8 @@ self.onmessage = (e) => {
 - `sortRows`: Individual row-by-row pixel sorting creating liquid horizontal color smear streaks.
 - `randomSortRows`: Stochastically selects random pixel rows to sort, preserving partial image structure.
 - `dumbSortRows`: Heavily randomized row sorting with coarse pivot thresholds.
-- `pixelSort`: Adaptive threshold-based pixel sort simulating classic ASDF / Processing sorting.
+- `pixelSort`: Multi-directional interval pixel sorting across horizontal, vertical, diagonal, or diagonal-alt axes with threshold or edge bounding.
+- `edgePixelSort`: Edge-guided contour-bounded pixel sorting using Sobel gradient edge detection to contain melting streaks within natural contours without rendering the edges.
 
 ### Slicing & Geometry
 - `slice`, `slice2`, `slice3`: Displaces horizontal image slices sideways, emulating analog tracking errors.

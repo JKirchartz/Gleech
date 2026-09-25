@@ -17,7 +17,7 @@ export default defineConfig({
     strictPort: true
   },
   build: {
-    outDir: 'docs',
+    outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
       input: {

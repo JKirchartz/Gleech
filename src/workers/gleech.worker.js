@@ -24,7 +24,10 @@ self.onmessage = async function(e) {
     const imageData = new ImageData(dataArray, width, height);
 
     // Execute glitch algorithm in worker thread
-    gleech[algorithm](imageData, options);
+    const res = gleech[algorithm](imageData, options);
+    if (res && res.data && res.data !== dataArray) {
+      dataArray.set(res.data);
+    }
 
     const subAlgorithms = (algorithm === 'theWorks' && gleech.theWorks && gleech.theWorks.lastSelected)
       ? [...gleech.theWorks.lastSelected]

@@ -1,4 +1,5 @@
 import { algorithmParams } from './algorithm-params.js';
+import * as databendModule from './databend.js';
 
 /**
  * @file gleech-engine.js
@@ -16,7 +17,7 @@ var gleech = (function(gleech) {
   var imageData, originalImageData;
 
   /**
-   * Algorithm categories grouping all 68 glitch filters.
+   * Algorithm categories grouping all glitch filters.
    * @type {Object.<string, string[]>}
    */
   gleech.categories = {
@@ -25,13 +26,14 @@ var gleech = (function(gleech) {
     digitalTV: ['tsPacketLoss', 'macroblockFreeze', 'digitalArtifacts'],
     analogCRT: ['DrumrollHorizontal', 'DrumrollVertical', 'DrumrollHorizontalWave', 'DrumrollVerticalWave', 'vcrTracking', 'verticalHold', 'antennaGhost', 'interlaceJitter'],
     dithering: ['ditherFloydSteinberg', 'ditherAtkinsons', 'ditherBayer', 'ditherBayer3', 'dither8Bit', 'ditherHalftone', 'ditherBitmask', 'ditherRandom', 'ditherRandom3'],
-    pixelSorting: ['pixelFunk', 'superPixelFunk', 'sort', 'shortsort', 'shortdumbsort', 'slicesort', 'sortStripe', 'sortRows', 'randomSortRows', 'dumbSortRows', 'pixelSort'],
+    pixelSorting: ['pixelFunk', 'superPixelFunk', 'sort', 'shortsort', 'shortdumbsort', 'slicesort', 'sortStripe', 'sortRows', 'randomSortRows', 'dumbSortRows', 'pixelSort', 'edgePixelSort'],
     geometry: ['slice', 'slice2', 'slice3', 'superSlice', 'superSlice2', 'scanlines', 'focusImage', 'fractal', 'fractal2', 'fractalGhosts', 'fractalGhosts2', 'fractalGhosts3', 'fractalGhosts4'],
-    colorShifts: ['rgb_glitch', 'superShift', 'colorShift', 'colorShift2', 'redShift', 'greenShift', 'blueShift', 'invert']
+    colorShifts: ['rgb_glitch', 'superShift', 'colorShift', 'colorShift2', 'redShift', 'greenShift', 'blueShift', 'invert'],
+    databending: ['databend', 'headerShear', 'bytebeatRaster', 'audioEchoBend']
   };
 
   /**
-   * Master list of all 68 algorithm names.
+   * Master list of all algorithm names.
    * @type {string[]}
    */
   gleech.all = [
@@ -42,7 +44,8 @@ var gleech = (function(gleech) {
     ...gleech.categories.dithering,
     ...gleech.categories.pixelSorting,
     ...gleech.categories.geometry,
-    ...gleech.categories.colorShifts
+    ...gleech.categories.colorShifts,
+    ...gleech.categories.databending
   ];
 
   /* Structured parameter metadata and configurable controls for all 68 glitch commands */
@@ -832,41 +835,175 @@ var gleech = (function(gleech) {
   gleech.scanlines = function scanlines(e,t){var n=new Uint32Array(e.data.buffer),i=e.width;e.height;for(var a=o(0,3),s=Math.max(1,Math.round(r(t,`density`,function(){return o(3,15)}))),c=u([5592405,4278255360,15790320,3355443]),l=u([4283782485,0xffff00ff00,4293980400,4281545523]),d=0,f=n.length;d<f;d+=i*s){var p=Array.apply([],n.subarray(d,d+i));for(var m in p)p[m]=a===0?p[m]^c:a===1?p[m]|l:~p[m]|4278190080;n.set(p,d)}return e.data.set(n.buffer),e};
 
   /**
-   * Kim Asendorf threshold-bounded interval pixel sorting.
-   * Scans rows for contiguous brightness runs between threshold bounds and sorts pixels within each run.
-   *
-   * @param {ImageData} imageData - Target canvas image data
-   * @param {Object} [options] - Configuration options
-   * @param {number} [options.threshold=128] - Luminance cutoff threshold (0-255)
-   * @returns {ImageData} Mutated image data
+   * Internal multi-directional interval pixel sorter.
+   * Supports horizontal, vertical, and diagonal passes bounded by brightness thresholds or edge contours.
    */
-  gleech.pixelSort = function pixelSort(imageData, options) {
-    var pixels = new Uint32Array(imageData.data.buffer);
+  function runIntervalSort(imageData, options, defaultMode, defaultDirection) {
     var width = imageData.width;
-    var threshold = getOpt(options, 'threshold', null, 128);
-    for (var r = 0; r < pixels.length; r += width) {
-      var row = Array.from(pixels.subarray(r, r + width));
-      var start = -1, end = -1;
-      for (var x = 0; x < width; x++) {
-        var val = row[x];
-        var lum = ((val & 0xFF) + (val >> 8 & 0xFF) + (val >> 16 & 0xFF)) / 3;
-        if (start === -1 && lum >= threshold) {
-          start = x;
-        } else if (start !== -1 && end === -1 && lum < threshold) {
-          end = x;
-          break;
-        }
-      }
-      if (start !== -1) {
-        if (end === -1) end = width;
-        if (end - start > 1) {
-          var slice = row.slice(start, end);
-          slice.sort(leftSort);
-          pixels.set(slice, r + start);
+    var height = imageData.height;
+    var data = imageData.data;
+    var pixels = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
+
+    var direction = getOpt(options, 'direction', null, defaultDirection || 'horizontal');
+    var mode = getOpt(options, 'mode', null, defaultMode || 'threshold');
+    var threshold = Math.max(0, Math.min(255, Math.round(getOpt(options, 'threshold', null, 128))));
+    var edgeThreshold = Math.max(1, Math.min(255, Math.round(getOpt(options, 'edgeThreshold', null, 25))));
+    var reverse = Boolean(getOpt(options, 'reverse', null, false));
+
+    var totalPixels = width * height;
+    var maxLine = Math.max(width, height) * 2 + 2;
+    var lineIndices = new Int32Array(maxLine);
+    var spanVals = new Uint32Array(maxLine);
+    var spanScores = new Float32Array(maxLine);
+    var order = new Int32Array(maxLine);
+
+    var luma = new Float32Array(totalPixels);
+    for (var i = 0, p = 0; i < data.length; i += 4, p++) {
+      luma[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+
+    var edges = null;
+    if (mode === 'edge') {
+      edges = new Uint8Array(totalPixels);
+      for (var y = 1; y < height - 1; y++) {
+        var rowOffset = y * width;
+        var prevRow = (y - 1) * width;
+        var nextRow = (y + 1) * width;
+        for (var x = 1; x < width - 1; x++) {
+          var gx = -luma[prevRow + x - 1] + luma[prevRow + x + 1]
+                   - 2 * luma[rowOffset + x - 1] + 2 * luma[rowOffset + x + 1]
+                   - luma[nextRow + x - 1] + luma[nextRow + x + 1];
+          var gy = -luma[prevRow + x - 1] - 2 * luma[prevRow + x] - luma[prevRow + x + 1]
+                   + luma[nextRow + x - 1] + 2 * luma[nextRow + x] + luma[nextRow + x + 1];
+          if (Math.hypot(gx, gy) >= edgeThreshold) {
+            edges[rowOffset + x] = 1;
+          }
         }
       }
     }
+
+    function sortSpan(startIdxInLine, length) {
+      if (length <= 1) return;
+      for (var s = 0; s < length; s++) {
+        var pIdx = lineIndices[startIdxInLine + s];
+        spanVals[s] = pixels[pIdx];
+        spanScores[s] = luma[pIdx];
+        order[s] = s;
+      }
+      var activeOrder = order.subarray(0, length);
+      if (reverse) {
+        activeOrder.sort(function(a, b) { return spanScores[b] - spanScores[a]; });
+      } else {
+        activeOrder.sort(function(a, b) { return spanScores[a] - spanScores[b]; });
+      }
+      for (var j = 0; j < length; j++) {
+        pixels[lineIndices[startIdxInLine + j]] = spanVals[activeOrder[j]];
+      }
+    }
+
+    function processLine(count) {
+      var spanStart = -1;
+      var spanLen = 0;
+      if (mode === 'edge') {
+        for (var idx = 0; idx < count; idx++) {
+          var pIdx = lineIndices[idx];
+          if (edges[pIdx]) {
+            if (spanLen > 1) sortSpan(spanStart, spanLen);
+            spanStart = -1;
+            spanLen = 0;
+          } else {
+            if (spanStart === -1) spanStart = idx;
+            spanLen++;
+          }
+        }
+        if (spanLen > 1) sortSpan(spanStart, spanLen);
+      } else {
+        for (var k = 0; k < count; k++) {
+          var pIdx2 = lineIndices[k];
+          if (luma[pIdx2] >= threshold) {
+            if (spanStart === -1) spanStart = k;
+            spanLen++;
+          } else {
+            if (spanLen > 1) sortSpan(spanStart, spanLen);
+            spanStart = -1;
+            spanLen = 0;
+          }
+        }
+        if (spanLen > 1) sortSpan(spanStart, spanLen);
+      }
+    }
+
+    if (direction === 'vertical' || direction === 'up' || direction === 'down') {
+      for (var col = 0; col < width; col++) {
+        for (var row = 0; row < height; row++) lineIndices[row] = row * width + col;
+        processLine(height);
+      }
+    } else if (direction === 'diagonal' || direction === 'diagonal-down') {
+      for (var d = -(height - 1); d < width; d++) {
+        var dx = d >= 0 ? d : 0;
+        var dy = d >= 0 ? 0 : -d;
+        var dCount = 0;
+        while (dx < width && dy < height) {
+          lineIndices[dCount++] = dy * width + dx;
+          dx++;
+          dy++;
+        }
+        if (dCount > 1) processLine(dCount);
+      }
+    } else if (direction === 'diagonal-alt' || direction === 'diagonal-up') {
+      for (var s = 0; s < width + height - 1; s++) {
+        var sx = s < width ? s : width - 1;
+        var sy = s < width ? 0 : s - (width - 1);
+        var sCount = 0;
+        while (sx >= 0 && sy < height) {
+          lineIndices[sCount++] = sy * width + sx;
+          sx--;
+          sy++;
+        }
+        if (sCount > 1) processLine(sCount);
+      }
+    } else {
+      for (var hRow = 0; hRow < height; hRow++) {
+        var base = hRow * width;
+        for (var hCol = 0; hCol < width; hCol++) lineIndices[hCol] = base + hCol;
+        processLine(width);
+      }
+    }
+
     return imageData;
+  }
+
+  /**
+   * Kim Asendorf threshold-bounded interval pixel sorting across horizontal, vertical, or diagonal axes.
+   * Scans lines for contiguous brightness runs between threshold bounds and sorts pixels within each run.
+   *
+   * @param {ImageData} imageData - Target canvas image data
+   * @param {Object} [options] - Configuration options
+   * @param {string} [options.direction='horizontal'] - Sort direction ('horizontal', 'vertical', 'diagonal', 'diagonal-alt')
+   * @param {string} [options.mode='threshold'] - Boundary mode ('threshold' or 'edge')
+   * @param {number} [options.threshold=128] - Luminance cutoff threshold (0-255)
+   * @param {number} [options.edgeThreshold=25] - Edge sensitivity threshold if in edge mode (1-255)
+   * @param {boolean} [options.reverse=false] - Invert sort ordering
+   * @returns {ImageData} Mutated image data
+   */
+  gleech.pixelSort = function pixelSort(imageData, options) {
+    return runIntervalSort(imageData, options, 'threshold', 'horizontal');
+  };
+
+  /**
+   * Edge-guided contour-bounded pixel sorting.
+   * Detects image edges using a Sobel gradient filter and sorts pixel spans bounded by contours,
+   * without rendering or overlaying the detected edges onto the photo.
+   *
+   * @param {ImageData} imageData - Target canvas image data
+   * @param {Object} [options] - Configuration options
+   * @param {string} [options.direction='vertical'] - Sort direction ('vertical', 'horizontal', 'diagonal', 'diagonal-alt')
+   * @param {number} [options.edgeThreshold=25] - Edge sensitivity threshold (lower = more edges)
+   * @param {boolean} [options.reverse=false] - Invert sort ordering
+   * @returns {ImageData} Mutated image data
+   */
+  gleech.edgePixelSort = function edgePixelSort(imageData, options) {
+    return runIntervalSort(imageData, options, 'edge', 'vertical');
   };
 
   /**
@@ -1817,6 +1954,94 @@ var gleech = (function(gleech) {
     console.log('glitch history', hist);
     return imageData;
   };
+
+  /* =========================================================================
+   * Databending & Raw Byte Corruption Algorithms
+   * ========================================================================= */
+
+  /**
+   * Universal Databending filter.
+   * Converts ImageData to uncompressed byte buffer, applies header stride shear
+   * or audio-inspired DSP (delay, comb, bytebeat), and decodes back.
+   *
+   * @param {ImageData} [imgData] - Target image buffer
+   * @param {Object} [options] - Filter parameters
+   * @returns {ImageData} Mutated ImageData
+   */
+  gleech.databend = function databend(imgData, options) {
+    imgData = imgData || gleech.imageData;
+    const res = databendModule.databend(imgData, options);
+    if (res && res.data && res.data !== imgData.data) {
+      imgData.data.set(res.data);
+    }
+    return imgData;
+  };
+  // Expose raw byte databending methods and format parsers directly on gleech.databend
+  Object.assign(gleech.databend, databendModule);
+
+  /**
+   * Header Stride Shear.
+   * Corrupts declared DIB width in the file header, forcing decoder to wrap scanlines diagonally.
+   *
+   * @param {ImageData} [imgData] - Target image buffer
+   * @param {Object} [options] - Filter parameters
+   * @param {number} [options.strideDelta=2] - Stride shift in pixels
+   * @returns {ImageData} Mutated ImageData
+   */
+  gleech.headerShear = function headerShear(imgData, options) {
+    imgData = imgData || gleech.imageData;
+    const strideDelta = (options && options.strideDelta !== undefined) ? options.strideDelta : 2;
+    const res = databendModule.databend(imgData, { technique: 'headerShear', strideDelta });
+    if (res && res.data && res.data !== imgData.data) {
+      imgData.data.set(res.data);
+    }
+    return imgData;
+  };
+
+  /**
+   * Bytebeat Audio Raster.
+   * Treats pixel bytes as 8-bit PCM audio, applying algorithmic formulas (Viznut, Sierpinski).
+   *
+   * @param {ImageData} [imgData] - Target image buffer
+   * @param {Object} [options] - Filter parameters
+   * @param {number} [options.formula=1] - Preset formula (1-5)
+   * @param {number} [options.mix=0.5] - Blend ratio
+   * @returns {ImageData} Mutated ImageData
+   */
+  gleech.bytebeatRaster = function bytebeatRaster(imgData, options) {
+    imgData = imgData || gleech.imageData;
+    const formula = (options && options.formula) || 1;
+    const mix = (options && options.mix !== undefined) ? options.mix : 0.5;
+    const res = databendModule.databend(imgData, { technique: 'bytebeat', formula, mix });
+    if (res && res.data && res.data !== imgData.data) {
+      imgData.data.set(res.data);
+    }
+    return imgData;
+  };
+
+  /**
+   * Audacity Echo Bend.
+   * Multi-tap delay and feedback decay across raw PCM bytes.
+   *
+   * @param {ImageData} [imgData] - Target image buffer
+   * @param {Object} [options] - Filter parameters
+   * @param {number} [options.delay=128] - Delay in bytes
+   * @param {number} [options.decay=0.5] - Feedback decay
+   * @param {number} [options.passes=2] - Number of passes
+   * @returns {ImageData} Mutated ImageData
+   */
+  gleech.audioEchoBend = function audioEchoBend(imgData, options) {
+    imgData = imgData || gleech.imageData;
+    const delay = (options && options.delay) || 128;
+    const decay = (options && options.decay !== undefined) ? options.decay : 0.5;
+    const passes = (options && options.passes) || 2;
+    const res = databendModule.databend(imgData, { technique: 'audioEcho', delay, decay, passes });
+    if (res && res.data && res.data !== imgData.data) {
+      imgData.data.set(res.data);
+    }
+    return imgData;
+  };
+
   return gleech;
 }(typeof globalThis !== 'undefined' ? (globalThis.gleech = globalThis.gleech || {}) : {}));
 

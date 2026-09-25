@@ -6,7 +6,14 @@
   import { gleech } from '../core/gleech-engine.js';
   import { algorithmParams } from '../core/algorithm-params.js';
   import { workerPool } from '../workers/worker-pool.js';
-  import { loadImageFromFile, createDefaultTestImage, resultToDataUrl, dataUrlToImageData } from '../core/canvas-utils.js';
+  import {
+    loadImageFromFile,
+    createDefaultTestImage,
+    resultToDataUrl,
+    dataUrlToImageData,
+    setPreImportDatabend,
+    getPreImportDatabend
+  } from '../core/canvas-utils.js';
 
   let isGenerating = false;
   let currentSourceDataUrl = '';
@@ -15,6 +22,11 @@
   let seqCounter = 0;
   let activeTileId = null;
   let tileDebounceTimers = {};
+  let preImportTechnique = getPreImportDatabend().technique || 'none';
+
+  function handlePreImportChange() {
+    setPreImportDatabend(preImportTechnique);
+  }
 
   function getDefaultOptions(algo) {
     const schema = algorithmParams[algo];
@@ -248,6 +260,19 @@
 
 <div id="form">
   <input type="file" id="uploader" accept="image/*" on:change={handleFileInput} />
+  
+  <div class="pre-import-pill" title="Pre-import raw byte databending & header corruption before canvas decode">
+    <span class="pre-import-tag">PRE-IMPORT:</span>
+    <select id="pre_import_select_cruiser" bind:value={preImportTechnique} on:change={handlePreImportChange}>
+      <option value="none">Clean (None)</option>
+      <option value="headerShear">Header Stride Shear</option>
+      <option value="audioEcho">Audacity PCM Echo</option>
+      <option value="combFilter">Resonant Comb Filter</option>
+      <option value="bytebeat">Bytebeat Audio Raster</option>
+      <option value="jpegEntropy">JPEG Entropy Rot</option>
+    </select>
+  </div>
+
   <button type="button" id="sample_btn" on:click={loadSample}>Load Sample Image</button>
 
   {#if isGenerating}
@@ -322,6 +347,38 @@
 </div>
 
 <style>
+  .pre-import-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    background: #25282c;
+    border: 1px solid #3e444b;
+    border-radius: 4px;
+    padding: 0.25em 0.55em;
+    margin: 0.2em 0.3em;
+    vertical-align: middle;
+  }
+  .pre-import-tag {
+    font-size: 0.72em;
+    font-weight: bold;
+    color: #4ecdc4;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .pre-import-pill select {
+    background: #191b1e;
+    color: #f0f0f0;
+    border: 1px solid #4a515a;
+    border-radius: 3px;
+    padding: 0.2em 0.4em;
+    font-size: 0.85em;
+    cursor: pointer;
+  }
+  .pre-import-pill select:focus {
+    outline: none;
+    border-color: #4ecdc4;
+  }
+
   .generating-status {
     margin: 0.5em 0;
     padding: 0.5em 0.8em;

@@ -13,8 +13,8 @@ async function runTests() {
   // 1. Check all algorithms registered
   const algorithms = gleech.all;
   console.log(`[PASS] Registered ${algorithms.length} algorithms in engine.`);
-  if (algorithms.length < 68) {
-    throw new Error(`Expected at least 68 algorithms, found ${algorithms.length}`);
+  if (algorithms.length < 69) {
+    throw new Error(`Expected at least 69 algorithms, found ${algorithms.length}`);
   }
 
   // 2. Check each algorithm function exists

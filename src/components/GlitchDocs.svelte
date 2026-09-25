@@ -143,7 +143,13 @@
     redShift: { category: 'shift', desc: 'Isolates and amplifies the red channel while suppressing green and blue.' },
     greenShift: { category: 'shift', desc: 'Isolates and amplifies the green channel producing phosphor CRT green.' },
     blueShift: { category: 'shift', desc: 'Isolates and amplifies the blue channel producing deep cyan-blue ambiance.' },
-    invert: { category: 'shift', desc: 'Inverts all RGB pixel values (255 - value) producing negative exposure.' }
+    invert: { category: 'shift', desc: 'Inverts all RGB pixel values (255 - value) producing negative exposure.' },
+
+    edgePixelSort: { category: 'sort', desc: 'Sobel-guided threshold sort that confines pixel streaks to organic boundary contours.' },
+    databend: { category: 'databend', desc: 'Universal databending bridge converting pixels to raw uncompressed byte buffer for audio-inspired DSP or header stride shear.' },
+    headerShear: { category: 'databend', desc: 'Corrupts declared DIB width in the file header, forcing decoder to wrap scanlines diagonally.' },
+    bytebeatRaster: { category: 'databend', desc: 'Treats pixel bytes as 8-bit PCM audio, applying algorithmic bytebeat math equations across raster.' },
+    audioEchoBend: { category: 'databend', desc: 'Simulates opening image as raw PCM in Audacity with multi-pass delay and feedback decay.' }
   };
 
   const categoryLabels = {
@@ -154,7 +160,8 @@
     dither: 'Dither',
     sort: 'Pixel Sort',
     slice: 'Geometry',
-    shift: 'Color Shift'
+    shift: 'Color Shift',
+    databend: 'Databending'
   };
 
   const allAlgorithmsList = Object.keys(algorithmDetails);
@@ -250,6 +257,13 @@
                 <option value={name}>{name}</option>
               {/each}
             </optgroup>
+            {#if gleech.categories.databending}
+              <optgroup label="Databending &amp; Byte Corruption">
+                {#each gleech.categories.databending as name}
+                  <option value={name}>{name}</option>
+                {/each}
+              </optgroup>
+            {/if}
             <optgroup label="JPEG &amp; Anti-JPEG Corruption">
               {#each gleech.categories.jpegCorrupt as name}
                 <option value={name}>{name}</option>
@@ -524,11 +538,12 @@ self.onmessage = (e) =&gt; &#123;
       <div class="filter-tabs">
         <button type="button" class="tab {activeFilter === 'all' ? 'active' : ''}" on:click={() => activeFilter = 'all'}>All ({allAlgorithmsList.length})</button>
         <button type="button" class="tab {activeFilter === 'preset' ? 'active' : ''}" on:click={() => activeFilter = 'preset'}>Presets (7)</button>
+        <button type="button" class="tab {activeFilter === 'databend' ? 'active' : ''}" on:click={() => activeFilter = 'databend'}>Databending (4)</button>
         <button type="button" class="tab {activeFilter === 'jpeg' ? 'active' : ''}" on:click={() => activeFilter = 'jpeg'}>JPEG Corrupt (9)</button>
         <button type="button" class="tab {activeFilter === 'digitaltv' ? 'active' : ''}" on:click={() => activeFilter = 'digitaltv'}>Digital TV (3)</button>
         <button type="button" class="tab {activeFilter === 'drumroll' ? 'active' : ''}" on:click={() => activeFilter = 'drumroll'}>Analog TV &amp; CRT (8)</button>
         <button type="button" class="tab {activeFilter === 'dither' ? 'active' : ''}" on:click={() => activeFilter = 'dither'}>Dithering (9)</button>
-        <button type="button" class="tab {activeFilter === 'sort' ? 'active' : ''}" on:click={() => activeFilter = 'sort'}>Pixel Sort (11)</button>
+        <button type="button" class="tab {activeFilter === 'sort' ? 'active' : ''}" on:click={() => activeFilter = 'sort'}>Pixel Sort (12)</button>
         <button type="button" class="tab {activeFilter === 'slice' ? 'active' : ''}" on:click={() => activeFilter = 'slice'}>Geometry (13)</button>
         <button type="button" class="tab {activeFilter === 'shift' ? 'active' : ''}" on:click={() => activeFilter = 'shift'}>Color Shifts (8)</button>
       </div>
@@ -941,6 +956,7 @@ self.onmessage = (e) =&gt; &#123;
     justify-content: space-between;
   }
   .algo-card.cat-preset { border-top: 3px solid #9333ea; }
+  .algo-card.cat-databend { border-top: 3px solid #0d9488; }
   .algo-card.cat-jpeg { border-top: 3px solid #d97706; }
   .algo-card.cat-digitaltv { border-top: 3px solid #059669; }
   .algo-card.cat-drumroll { border-top: 3px solid #db2777; }
@@ -967,6 +983,7 @@ self.onmessage = (e) =&gt; &#123;
     text-transform: uppercase;
   }
   .tag-preset { background: #f3e8ff; color: #7e22ce; }
+  .tag-databend { background: #ccfbf1; color: #0f766e; }
   .tag-jpeg { background: #fef3c7; color: #b45309; }
   .tag-digitaltv { background: #d1fae5; color: #047857; }
   .tag-drumroll { background: #fce7f3; color: #be185d; }

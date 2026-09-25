@@ -40,7 +40,7 @@
     "dev": "vite",
     "build": "vite build && node -e \"const fs=require('fs'); fs.writeFileSync('dist/.nojekyll', ''); fs.cpSync('dist', 'docs', {recursive:true});\"",
     "preview": "vite preview",
-    "lint": "node --check index.js bin/gleech src/main.js src/core/gleech-engine.js src/core/canvas-utils.js src/workers/gleech.worker.js src/workers/worker-pool.js",
+    "lint": "node --check index.js bin/gleech src/main.js src/core/gleech-engine.js src/core/canvas-utils.js src/core/databend.js src/core/algorithm-params.js src/workers/gleech.worker.js src/workers/worker-pool.js",
     "test": "node --check index.js && node ./bin/gleech list && node test/test.js && node test/test-rig.js",
     "test:rig": "node test/test-rig.js"
   },

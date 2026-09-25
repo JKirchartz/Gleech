@@ -45,7 +45,10 @@ function decorateJimpImage(image) {
         width: image.bitmap.width,
         height: image.bitmap.height
       };
-      gleech[algo](target, ...args);
+      const res = gleech[algo](target, ...args);
+      if (res && res.data && res.data !== image.bitmap.data) {
+        image.bitmap.data.set(res.data);
+      }
       return image; // Chainable: img.algoA().algoB()
     };
   }
